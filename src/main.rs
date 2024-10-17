@@ -1,12 +1,49 @@
 use goblin::elf::Elf;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::{convert::TryFrom, os::fd::FromRawFd};
+use std::os::fd::FromRawFd;
 use std::{env, process};
-use strum_macros::{Display, EnumString};
 
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
+const REG_NAMES: [&str; 32] = [
+    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2",
+    "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+    "t3", "t4", "t5", "t6",
+];
+
+const R_ZERO: usize = 0;
+const R_RA: usize = 1;
+const R_SP: usize = 2;
+const R_GP: usize = 3;
+const R_TP: usize = 4;
+const R_T0: usize = 5;
+const R_T1: usize = 6;
+const R_T2: usize = 7;
+const R_FP: usize = 8;
+const R_S0: usize = 8;
+const R_S1: usize = 9;
+const R_A0: usize = 10;
+const R_A1: usize = 11;
+const R_A2: usize = 12;
+const R_A3: usize = 13;
+const R_A4: usize = 14;
+const R_A5: usize = 15;
+const R_A6: usize = 16;
+const R_A7: usize = 17;
+const R_S2: usize = 18;
+const R_S3: usize = 19;
+const R_S4: usize = 20;
+const R_S5: usize = 21;
+const R_S6: usize = 22;
+const R_S7: usize = 23;
+const R_S8: usize = 24;
+const R_S9: usize = 25;
+const R_S10: usize = 26;
+const R_S11: usize = 27;
+const R_T3: usize = 28;
+const R_T4: usize = 29;
+const R_T5: usize = 30;
+const R_T6: usize = 31;
 
 macro_rules! opcode {
     ($value:expr) => {
@@ -32,11 +69,11 @@ macro_rules! funct3 {
     };
 }
 
-macro_rules! rs2 {
-    ($value:expr) => {
-        ((($value >> 7) & 0b1_1111) as usize)
-    };
-}
+// macro_rules! rs2 {
+//     ($value:expr) => {
+//         ((($value >> 7) & 0b1_1111) as usize)
+//     };
+// }
 
 macro_rules! sext {
     ($value:expr, $bits:expr) => {
@@ -46,44 +83,6 @@ macro_rules! sext {
             (($value) & (0xffffff << ($bits)))
         }
     };
-}
-
-#[derive(Debug, Display, EnumString, TryFromPrimitive, IntoPrimitive)]
-#[strum(serialize_all = "lowercase")]
-#[repr(usize)]
-enum Reg {
-    Zero = 0,
-    Ra,
-    Sp,
-    Gp,
-    Tp,
-    T0,
-    T1,
-    T2,
-    S0, /* Fp */
-    S1,
-    A0,
-    A1,
-    A2,
-    A3,
-    A4,
-    A5,
-    A6,
-    A7,
-    S2,
-    S3,
-    S4,
-    S5,
-    S6,
-    S7,
-    S8,
-    S9,
-    S10,
-    S11,
-    T3,
-    T4,
-    T5,
-    T6,
 }
 
 pub struct VirtualMachine {
@@ -215,7 +214,7 @@ impl VirtualMachine {
             "{:x} {:08x}: auipc {}, 0x{:x}",
             self.pc,
             self.curr(),
-            Reg::try_from(rd).unwrap(),
+            REG_NAMES[rd],
             imm20
         );
         self.reg[rd] = self.pc as u32 + (imm20 << 12);
@@ -226,8 +225,8 @@ impl VirtualMachine {
             "{:x} {:08x}: addi {}, {}, {}",
             self.pc,
             self.curr(),
-            Reg::try_from(rd).unwrap(),
-            Reg::try_from(rs1).unwrap(),
+            REG_NAMES[rd],
+            REG_NAMES[rs1],
             sext!(imm12, 12)
         );
         self.reg[rd] = self.reg[rs1] + sext!(imm12, 12);
@@ -235,38 +234,32 @@ impl VirtualMachine {
 
     fn ecall(&mut self) {
         log::debug!("{:x} {:08x}: ecall", self.pc, self.curr());
-        let a7: usize = Reg::A7.into();
-        let syscall = self.reg[a7];
+        let syscall = self.reg[R_A7];
         match syscall {
             64 => {
                 // RISC-V write
-                let a0: usize = Reg::A0.into();
-                let a1: usize = Reg::A1.into();
-                let a2: usize = Reg::A2.into();
-
                 log::debug!(
                     "write syscall: fp: {} addr: {:x} len: {}",
-                    self.reg[a0],
-                    self.reg[a1],
-                    self.reg[a2]
+                    self.reg[R_A0],
+                    self.reg[R_A1],
+                    self.reg[R_A2]
                 );
 
-                let mut fp = unsafe { File::from_raw_fd(self.reg[a0] as i32) };
-                let addr = self.reg[a1] as usize;
-                let len = self.reg[a2] as usize;
+                let mut fp = unsafe { File::from_raw_fd(self.reg[R_A0] as i32) };
+                let addr = self.reg[R_A1] as usize;
+                let len = self.reg[R_A2] as usize;
                 if let Ok(len) = fp.write(&self.mem[addr..addr + len]) {
                     log::trace!("wrote {} bytes", len);
-                    self.reg[a0] = len as u32;
+                    self.reg[R_A0] = len as u32;
                 } else {
                     log::trace!("write error");
-                    self.reg[a0] = 0xffffffff;
+                    self.reg[R_A0] = 0xffffffff;
                 }
             }
             93 => {
                 // RISC-V exit
-                let a0: usize = Reg::A0.into();
-                log::trace!("exit syscall: rc: {}", self.reg[a0]);
-                process::exit(self.reg[a0] as i32);
+                log::trace!("exit syscall: rc: {}", self.reg[R_A0]);
+                process::exit(self.reg[R_A0] as i32);
             }
             _ => {
                 log::error!("unknown/unimplemented syscall: {}", syscall);
