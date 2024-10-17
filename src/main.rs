@@ -1,12 +1,9 @@
 use goblin::elf::Elf;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::ffi::c_void;
-use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::net::UnixStream;
-use std::process::{self, Stdio};
 use std::{convert::TryFrom, os::fd::FromRawFd};
+use std::{env, process};
 use strum_macros::{Display, EnumString};
 
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
@@ -190,11 +187,11 @@ impl VirtualMachine {
         }
     }
 
-    fn dump(&self) {
+    fn memdump(&self, prefix: &str) {
         let mut i: usize = 0;
         for value in self.mem.iter() {
             if *value != 0 {
-                println!("{:x}: {:02x}", i, value);
+                log::debug!("{}{:x}: {:02x}", prefix, i, value);
             }
             i += 1;
         }
@@ -272,8 +269,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut vm: VirtualMachine = VirtualMachine::load_from("hello")?;
     log::debug!("start address: 0x{:x}", vm.pc);
 
+    if let Ok(value) = env::var("RUST_LOG") {
+        if value.to_lowercase() == "debug".to_string() {
+            vm.memdump("memdump: ");
+        }
+    }
+
     vm.run();
-    // vm.dump();
 
     Ok(())
 }
