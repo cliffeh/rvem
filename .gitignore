@@ -19,3 +19,7 @@ target/
 # generated files (for testing)
 hello.o
 hello
+
+# temporary/scratch files
+scratch
+tmpfil

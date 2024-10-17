@@ -1,0 +1,16 @@
+impl VirtualMachine {
+    pub fn run(&mut self) {
+        while self.mem[self.pc] != 0 {
+            let inst = self.curr();
+            let opcode = inst & 0b1111111;
+            match opcode {
+                /* CASES */
+                _ => {
+                    log::error!("{:x} {:08x}: unimplemented opcode: {:07b}", self.pc, inst, opcode);
+                }
+            }
+
+            self.pc += 4;
+        }
+    }
+}
