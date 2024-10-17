@@ -2,6 +2,7 @@
 RISC-V emulator
 
 # References
+* [RISC-V Instruction Set Manual](https://riscv.org/wp-content/uploads/2017/05/riscv-spec-v2.2.pdf)
 * [RV32I Base Integer Instruction Set](https://docs.openhwgroup.org/projects/cva6-user-manual/01_cva6_user/RISCV_Instructions_RV32I.html)
 * [RISC-V Instruction Encoder/Decoder](https://luplab.gitlab.io/rvcodecjs/)
 * [Instruction Table](https://five-embeddev.com/riscv-user-isa-manual/Priv-v1.12/instr-table.html)
