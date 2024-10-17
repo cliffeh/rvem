@@ -4,7 +4,8 @@ use std::env;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let mut vm: VirtualMachine = VirtualMachine::load_from("hello")?;
+    // TODO cli args!
+    let mut vm: VirtualMachine = VirtualMachine::load_from("fib")?;
     log::debug!("start address: 0x{:x}", vm.pc);
 
     if let Ok(value) = env::var("RUST_LOG") {

@@ -12,11 +12,34 @@ trace: hello  ## run rvem with trace logging enabled
 	RUST_LOG=trace cargo run
 .PHONY: trace
 
+fib: fib.o  ## build RISC-V `fib` program
+	riscv64-elf-ld -melf32lriscv -o $@ $<
+
+fib.o: fib.s
+	riscv64-elf-as -march=rv32i $< -o $@
+
+itoa.o: itoa.s
+	riscv64-elf-as -march=rv32i $< -o $@
+
 hello: hello.o  ## build RISC-V `hello` program
 	riscv64-elf-ld -melf32lriscv -o $@ $<
 
 hello.o: hello.s
 	riscv64-elf-as -march=rv32i $< -o $@
+
+strlen: strlen.o  ## build RISC-V `strlen` program
+	riscv64-elf-ld -melf32lriscv -o $@ $<
+
+strlen.o: strlen.s
+	riscv64-elf-as -march=rv32i $< -o $@
+
+dump-fib: fib  ## disassemble executable sections of `fib`
+	riscv64-elf-objdump -d $<
+.PHONY: dump
+
+dumpall-fib: fib  ## disassemble all sections of `fib`
+	riscv64-elf-objdump -D $<
+.PHONY: dump
 
 dump-hello: hello  ## disassemble executable sections of `hello`
 	riscv64-elf-objdump -d $<
@@ -25,6 +48,10 @@ dump-hello: hello  ## disassemble executable sections of `hello`
 dumpall-hello: hello  ## disassemble all sections of `hello`
 	riscv64-elf-objdump -D $<
 .PHONY: dump
+
+format:  # beautify all rust code
+	cargo fmt
+.PHONY: format
 
 clean:  ## remove intermediate object files
 	rm -f *.o

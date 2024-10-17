@@ -17,8 +17,10 @@ target/
 #.idea/
 
 # generated files (for testing)
-hello.o
+*.o
+fib
 hello
+strlen
 
 # temporary/scratch files
 scratch
