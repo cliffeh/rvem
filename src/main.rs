@@ -255,17 +255,17 @@ impl VirtualMachine {
                 let addr = self.reg[a1] as usize;
                 let len = self.reg[a2] as usize;
                 if let Ok(len) = fp.write(&self.mem[addr..addr + len]) {
-                    log::debug!("wrote {} bytes", len);
+                    log::trace!("wrote {} bytes", len);
                     self.reg[a0] = len as u32;
                 } else {
-                    log::debug!("write error");
+                    log::trace!("write error");
                     self.reg[a0] = 0xffffffff;
                 }
             }
             93 => {
                 // RISC-V exit
                 let a0: usize = Reg::A0.into();
-                log::debug!("exit syscall: rc: {}", self.reg[a0]);
+                log::trace!("exit syscall: rc: {}", self.reg[a0]);
                 process::exit(self.reg[a0] as i32);
             }
             _ => {
