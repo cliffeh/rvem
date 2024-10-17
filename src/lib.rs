@@ -24,7 +24,7 @@ macro_rules! rs1 {
 
 macro_rules! funct3 {
     ($value:expr) => {
-        ((($value >> 12) & 0b111) as usize)
+        (($value >> 12) & 0b111)
     };
 }
 
@@ -46,8 +46,8 @@ macro_rules! sext {
 
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 const REG_NAMES: [&str; 32] = [
-    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
-    "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6",
+    "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
 ];
 
 const R_ZERO: usize = 0;
@@ -160,27 +160,53 @@ impl VirtualMachine {
 
 impl VirtualMachine {
     /* I-Type */
+
+    // integer operations
     fn addi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!(
-            "{:x} {:08x}: addi {}, {}, {}",
-            self.pc,
-            self.curr(),
-            REG_NAMES[rd],
-            REG_NAMES[rs1],
-            sext!(imm12, 12)
-        );
+        log::debug!("{:x} {:08x}: addi {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
         self.reg[rd] = self.reg[rs1] + sext!(imm12, 12);
     }
+    fn andi(&mut self, rd: usize, rs1: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: andi {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
+        self.reg[rd] = self.reg[rs1] & sext!(imm12, 12);
+    }
+    fn ori(&mut self, rd: usize, rs1: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: xori {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
+        self.reg[rd] = self.reg[rs1] | sext!(imm12, 12);
+    }
+    fn slti(&mut self, rd: usize, rs1: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: slti {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
+        self.reg[rd] = if (self.reg[rs1] as i32) < (sext!(imm12, 12) as i32) { 1 } else { 0 };
+    }
+    fn sltiu(&mut self, rd: usize, rs1: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: sltiu {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
+        self.reg[rd] = if self.reg[rs1] < sext!(imm12, 12) { 1 } else { 0 };
+    }
+    fn xori(&mut self, rd: usize, rs1: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: xori {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
+        self.reg[rd] = self.reg[rs1] ^ sext!(imm12, 12);
+    }
+
+    // loads
+    fn lb(&mut self, rd: usize, rs1: usize, imm12: u32) {}
+    fn lh(&mut self, rd: usize, rs1: usize, imm12: u32) {}
+    fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {}
+    fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {}
+    fn lhu(&mut self, rd: usize, rs1: usize, imm12: u32) {}
+
+    // jump
+    fn jalr(&mut self, rd: usize, rs1: usize, imm12: u32) {}
 
     /* U-Type */
-    fn auipc(&mut self, rd: usize, imm: u32) {
-        log::debug!("{:x} {:08x}: auipc {}, 0x{:x}", self.pc, self.curr(), REG_NAMES[rd], imm);
-        self.reg[rd] = self.pc as u32 + (imm << 12);
+    fn auipc(&mut self, rd: usize, imm20: u32) {
+        log::debug!("{:x} {:08x}: auipc {}, 0x{:x}", self.pc, self.curr(), REG_NAMES[rd], imm20);
+        self.reg[rd] = self.pc as u32 + (imm20 << 12);
     }
 
-    fn lui(&mut self, rd: usize, imm: u32) {
-        self.reg[rd] = imm << 12;
+    fn lui(&mut self, rd: usize, imm20: u32) {
+        self.reg[rd] = imm20 << 12;
     }
+
     /* system calls */
     fn ecall(&mut self) {
         log::debug!("{:x} {:08x}: ecall", self.pc, self.curr());
