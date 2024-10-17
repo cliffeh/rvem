@@ -8,6 +8,10 @@ debug: hello
 	RUST_LOG=debug cargo run
 .PHONY: debug
 
+trace: hello
+	RUST_LOG=trace cargo run
+.PHONY: trace
+
 hello: hello.o
 	riscv64-elf-ld -melf32lriscv -o $@ $<
 

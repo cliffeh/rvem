@@ -150,6 +150,18 @@ impl VirtualMachine {
     }
 
     pub fn run(&mut self) {
+        // let trace: bool = {
+        //     if let Ok(value) = env::var("RUST_LOG") {
+        //         if value.to_lowercase() == "trace".to_string() {
+        //             true
+        //         } else {
+        //             false
+        //         }
+        //     } else {
+        //         false
+        //     }
+        // };
+
         while self.mem[self.pc] != 0 {
             let inst = self.curr();
 
@@ -191,7 +203,7 @@ impl VirtualMachine {
         let mut i: usize = 0;
         for value in self.mem.iter() {
             if *value != 0 {
-                log::debug!("{}{:x}: {:02x}", prefix, i, value);
+                log::trace!("{}{:x}: {:02x}", prefix, i, value);
             }
             i += 1;
         }
@@ -270,7 +282,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("start address: 0x{:x}", vm.pc);
 
     if let Ok(value) = env::var("RUST_LOG") {
-        if value.to_lowercase() == "debug".to_string() {
+        if value.to_lowercase() == "trace".to_string() {
             vm.memdump("memdump: ");
         }
     }
