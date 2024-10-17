@@ -121,10 +121,16 @@ macro_rules! sext {
     };
 }
 
+macro_rules! inst_error {
+    ($pc:expr, $inst:expr, $($arg:tt)+) => (log::error!("{:x}: {:08x} {}", $pc, $inst, format!($($arg)+)))
+}
+
+macro_rules! inst_debug {
+    ($pc:expr, $inst:expr, $($arg:tt)+) => (log::debug!("{:x}: {:08x} {}", $pc, $inst, format!($($arg)+)))
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-
-    println!("{:?}", Reg::A3);
 
     let mut buf: [u8; 1 << 20] = [0u8; 1 << 20];
     let mut pc = load_elf_data("hello", &mut buf)?;
@@ -140,8 +146,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match opcode!(inst) {
             0b0010111 => {
                 // AUIPC
-                log::debug!(
-                    "{pc:x}: {inst:08x} auipc {}, 0x{:x}",
+                inst_debug!(
+                    pc,
+                    inst,
+                    "auipc {}, 0x{:x}",
                     Reg::try_from(rd!(inst))?,
                     ((inst & 0xfffff000) >> 12)
                 );
@@ -151,16 +159,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match funct3!(inst) {
                     0b000 => {
                         // ADDI
-                        log::debug!(
-                            "{pc:x}: {inst:08x} addi {}, {}, {}",
+                        inst_debug!(
+                            pc,
+                            inst,
+                            "addi {}, {}, {}",
                             Reg::try_from(rd!(inst))?,
                             Reg::try_from(rs1!(inst))?,
-                            sext!(inst >> 20, 12)
+                            sext!(inst >> 20, 12) as i32
                         );
                     }
                     _ => {
-                        log::error!(
-                            "{pc:x}: {inst:08x} unknown opcode+funct3: {:07b} {:03b}",
+                        inst_error!(
+                            pc,
+                            inst,
+                            "unknown opcode+funct3: {:07b} {:03b}",
                             opcode!(inst),
                             funct3!(inst)
                         );
