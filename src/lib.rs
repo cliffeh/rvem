@@ -262,19 +262,19 @@ impl VirtualMachine {
 
     // loads
     fn lb(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: lb {}, {}({})", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1]);
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
+        log::debug!("{:x} {:08x}: lb {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
         self.reg[rd] = sext!(self.mem[addr] as u32, 8);
     }
     fn lh(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: lh {}, {}({})", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1]);
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
+        log::debug!("{:x} {:08x}: lh {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
         self.reg[rd] = self.mem[addr] as u32;
         self.reg[rd] |= sext!((self.mem[addr + 1] as u32) << 8, 16);
     }
     fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: lw {}, {}({})", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1]);
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
+        log::debug!("{:x} {:08x}: lw {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
