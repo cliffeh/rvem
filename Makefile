@@ -17,30 +17,29 @@ endif
 default: help
 
 run: $(PROG)  ## run rvem
-	cargo run -- $<
+	cargo run -- tests/data/$<
 .PHONY: hello
 
 debug: $(PROG)  ## run rvem with debug logging enabled
-	RUST_LOG=debug cargo run -- $<
+	RUST_LOG=debug cargo run -- tests/data/$<
 .PHONY: debug
 
 trace: $(PROG)  ## run rvem with trace logging enabled
-	RUST_LOG=trace cargo run -- $<
+	RUST_LOG=trace cargo run -- tests/data/$<
 .PHONY: trace
 
 dump: $(PROG)  ## disassemble executable sections
-	$(ASPREFIX)-objdump -d $<
+	$(ASPREFIX)-objdump -d tests/data/$<
 .PHONY: dump
 
 dumpall: $(PROG)  ## disassemble all sections
-	$(ASPREFIX)-objdump -D $<
+	$(ASPREFIX)-objdump -D tests/data/$<
 .PHONY: dump
 
 
 ### targets that actually build things
-$(PROGS): %: %.o  # TODO figure out why this rebuilds every time
-	$(ASPREFIX)-ld -melf32lriscv -o $@ $<
-	touch $@ $<
+$(PROGS): %: tests/data/%.o
+	$(ASPREFIX)-ld -melf32lriscv -o tests/data/$@ $<
 
 %.o: %.s
 	$(ASPREFIX)-as -march=rv32i $< -o $@
@@ -53,11 +52,11 @@ format:  ## beautify rust code
 fmt: format  ## alias for format
 
 clean:  ## remove intermediate object files
-	rm -f *.o
+	rm -f $(patsubst %, tests/data/%.o, $(PROGS))
 .PHONY: clean
 
 binclean: clean  ## remove assembled RISC-V programs
-	rm -f $(PROGS)
+	rm -f $(patsubst %, tests/data/%, $(PROGS))
 .PHONY: binclean
 
 realclean: clean binclean  ## remove everything but source code
