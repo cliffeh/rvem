@@ -406,6 +406,10 @@ impl VirtualMachine {
                 let _ = std::io::stdin().read_line(&mut buf);
                 self.reg[R_A0] = buf.trim().parse::<u32>().unwrap(); // TODO get rid of unwrap
             }
+            10 => {
+                log::trace!("MIPS exit");
+                process::exit(0);
+            }
             64 => {
                 // RISC-V write
                 log::debug!("RISC-V linux write syscall: fp: {} addr: {:x} len: {}", self.reg[R_A0], self.reg[R_A1], self.reg[R_A2]);
