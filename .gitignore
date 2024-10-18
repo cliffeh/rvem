@@ -18,8 +18,9 @@ target/
 
 # generated files (for testing)
 *.o
-fib
 hello
+fib1
+fib2
 strlen
 
 # temporary/scratch files

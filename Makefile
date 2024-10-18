@@ -1,6 +1,18 @@
-PROGS=hello fib strlen
+PROGS=hello fib1 fib2 strlen
 DEFAULT_PROG=hello
 PROG?=$(DEFAULT_PROG)
+
+# Detect the platform
+UNAME_S := $(shell uname -s)
+
+# Set the toolchain prefix based on the platform
+ifeq ($(UNAME_S), Linux)
+    ASPREFIX = riscv64-linux-gnu
+else ifeq ($(UNAME_S), Darwin)
+    ASPREFIX = riscv64-elf
+else
+    $(error Unsupported platform: $(UNAME_S))
+endif
 
 default: help
 
@@ -17,12 +29,22 @@ trace: $(PROG)  ## run rvem with trace logging enabled
 .PHONY: trace
 
 dump: $(PROG)  ## disassemble executable sections
-	riscv64-elf-objdump -d $<
+	$(ASPREFIX)-objdump -d $<
 .PHONY: dump
 
 dumpall: $(PROG)  ## disassemble all sections
-	riscv64-elf-objdump -D $<
+	$(ASPREFIX)-objdump -D $<
 .PHONY: dump
+
+
+### targets that actually build things
+$(PROGS): %: %.o  # TODO figure out why this rebuilds every time
+	$(ASPREFIX)-ld -melf32lriscv -o $@ $<
+	touch $@ $<
+
+%.o: %.s
+	$(ASPREFIX)-as -march=rv32i $< -o $@
+
 
 format:  ## beautify rust code
 	cargo fmt
@@ -34,7 +56,7 @@ clean:  ## remove intermediate object files
 	rm -f *.o
 .PHONY: clean
 
-binclean:  ## remove assembled RISC-V programs
+binclean: clean  ## remove assembled RISC-V programs
 	rm -f $(PROGS)
 .PHONY: binclean
 
@@ -57,31 +79,13 @@ help: ## show this help
 	@echo "Available programs:"
 	@echo
 	@printf "  \033[0;36m%-10s\033[m %s\n" hello "(default) your bog standard \"Hello, World!\" program"
-	@printf "  \033[0;36m%-10s\033[m %s\n" fib "computes the Fibonacci sequence up to fib(42)"
+	@printf "  \033[0;36m%-10s\033[m %s\n" fib1 "computes the Fibonacci sequence up to fib(42)"
+	@printf "  \033[0;36m%-10s\033[m %s\n" fib2 "computes the Fibonacci sequence to a number of your choice"
 	@printf "  \033[0;36m%-10s\033[m %s\n" strlen "computes the length of \"The quick brown fox jumps over the lazy dog.\""
 	@echo ""
 	@echo "Examples:"
 	@echo
 	@printf "  \033[0;36m%-22s\033[m %s\n" "make run" "builds and runs 'hello'"
-	@printf "  \033[0;36m%-22s\033[m %s\n" "PROG=fib make trace" "builds and runs 'fib' with trace logging turned on"
+	@printf "  \033[0;36m%-22s\033[m %s\n" "PROG=fib1 make trace" "builds and runs 'fib' with trace logging turned on"
 	@printf "  \033[0;36m%-22s\033[m %s\n" "PROG=strlen make dump" "dumps the executable section of \`strlen\`"
 .PHONY: help
-
-### targets that actually build things
-fib: fib.o
-	riscv64-elf-ld -melf32lriscv -o $@ $<
-
-fib.o: fib.s
-	riscv64-elf-as -march=rv32i $< -o $@
-
-hello: hello.o
-	riscv64-elf-ld -melf32lriscv -o $@ $<
-
-hello.o: hello.s
-	riscv64-elf-as -march=rv32i $< -o $@
-
-strlen: strlen.o
-	riscv64-elf-ld -melf32lriscv -o $@ $<
-
-strlen.o: strlen.s
-	riscv64-elf-as -march=rv32i $< -o $@

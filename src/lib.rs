@@ -74,39 +74,39 @@ const REG_NAMES: [&str; 32] = [
     "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
 ];
 
-pub const R_ZERO: usize = 0;
-pub const R_RA: usize = 1;
-pub const R_SP: usize = 2;
-pub const R_GP: usize = 3;
-pub const R_TP: usize = 4;
-pub const R_T0: usize = 5;
-pub const R_T1: usize = 6;
-pub const R_T2: usize = 7;
-pub const R_FP: usize = 8;
-pub const R_S0: usize = 8;
-pub const R_S1: usize = 9;
-pub const R_A0: usize = 10;
-pub const R_A1: usize = 11;
-pub const R_A2: usize = 12;
-pub const R_A3: usize = 13;
-pub const R_A4: usize = 14;
-pub const R_A5: usize = 15;
-pub const R_A6: usize = 16;
-pub const R_A7: usize = 17;
-pub const R_S2: usize = 18;
-pub const R_S3: usize = 19;
-pub const R_S4: usize = 20;
-pub const R_S5: usize = 21;
-pub const R_S6: usize = 22;
-pub const R_S7: usize = 23;
-pub const R_S8: usize = 24;
-pub const R_S9: usize = 25;
-pub const R_S10: usize = 26;
-pub const R_S11: usize = 27;
-pub const R_T3: usize = 28;
-pub const R_T4: usize = 29;
-pub const R_T5: usize = 30;
-pub const R_T6: usize = 31;
+pub const R_ZERO: usize = 0; /* hardwired to 0, ignores writes    */
+pub const R_RA: usize = 1; /*   return address for jumps          */
+pub const R_SP: usize = 2; /*   stack pointer	                  */
+pub const R_GP: usize = 3; /*   global pointer                    */
+pub const R_TP: usize = 4; /*   thread pointer                    */
+pub const R_T0: usize = 5; /*   temporary register 0              */
+pub const R_T1: usize = 6; /*   temporary register 1              */
+pub const R_T2: usize = 7; /*   temporary register 2              */
+pub const R_FP: usize = 8; /*   saved register 0/frame pointer    */
+pub const R_S0: usize = 8; /*   saved register 0/frame pointer    */
+pub const R_S1: usize = 9; /*   saved register 1                  */
+pub const R_A0: usize = 10; /*  return value/function argument 0  */
+pub const R_A1: usize = 11; /*  return value/function argument 1  */
+pub const R_A2: usize = 12; /*  function argument 2               */
+pub const R_A3: usize = 13; /*  function argument 3               */
+pub const R_A4: usize = 14; /*  function argument 4               */
+pub const R_A5: usize = 15; /*  function argument 5               */
+pub const R_A6: usize = 16; /*  function argument 6               */
+pub const R_A7: usize = 17; /*  function argument 7               */
+pub const R_S2: usize = 18; /*  saved register 2                  */
+pub const R_S3: usize = 19; /*  saved register 3                  */
+pub const R_S4: usize = 20; /*  saved register 4                  */
+pub const R_S5: usize = 21; /*  saved register 5                  */
+pub const R_S6: usize = 22; /*  saved register 6                  */
+pub const R_S7: usize = 23; /*  saved register 7                  */
+pub const R_S8: usize = 24; /*  saved register 8                  */
+pub const R_S9: usize = 25; /*  saved register 9                  */
+pub const R_S10: usize = 26; /* saved register 10                 */
+pub const R_S11: usize = 27; /* saved register 11                 */
+pub const R_T3: usize = 28; /*  temporary register 3              */
+pub const R_T4: usize = 29; /*  temporary register 4              */
+pub const R_T5: usize = 30; /*  temporary register 5              */
+pub const R_T6: usize = 31; /*  temporary register 6              */
 
 pub struct VirtualMachine {
     pub pc: usize,
@@ -187,7 +187,7 @@ impl VirtualMachine {
     pub fn regdump(&self) {
         let mut s = String::new();
         for i in 0..self.reg.len() {
-            s += &format!("{}: {} ", REG_NAMES[i], self.reg[i]);
+            s += &format!("{}: 0x{:x} ", REG_NAMES[i], self.reg[i]);
         }
         log::trace!("{}", s);
     }
@@ -385,7 +385,7 @@ impl VirtualMachine {
         match syscall {
             1 => {
                 log::trace!("MIPS print_int"); // https://student.cs.uwaterloo.ca/~isg/res/mips/traps
-                println!("{}", (self.reg[R_A0] as i16));
+                println!("{}", (self.reg[R_A0] as i32));
                 std::io::stdout().flush().unwrap();
             }
             4 => {

@@ -1,6 +1,6 @@
         .data
 argument:
-        .word   3
+        .word   5
 str1:
         .string "Fibonacci("
 str2:
