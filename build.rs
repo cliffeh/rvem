@@ -18,6 +18,7 @@ fn main() {
     let mut btype: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut itype: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut rtype: HashMap<String, HashMap<String, HashMap<String, String>>> = HashMap::new();
+    let mut stype: HashMap<String, HashMap<String, String>> = HashMap::new();
 
     for line in read_to_string("src/rv32i.tab").unwrap().lines() {
         let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
@@ -51,6 +52,12 @@ fn main() {
                 let funct3 = rtype.entry(pieces[5].into()).or_default();
                 let funct7 = funct3.entry(pieces[3].into()).or_default();
                 funct7.insert(pieces[0].into(), pieces[6].into());
+            }
+            // imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
+            "imm[11:5]" => {
+                // S-Type
+                let funct3 = stype.entry(pieces[5].into()).or_default();
+                funct3.insert(pieces[3].into(), pieces[6].into());
             }
             // imm[31:12] rd 0110111 LUI
             "imm[31:12]" => {
@@ -100,6 +107,18 @@ fn main() {
             }
             cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
             cases += "}},";
+        }
+        cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
+        cases += "}},";
+    }
+
+    // S-Type
+    for (opcode, funct3s) in stype {
+        cases += &format!("0b{} => {{\n", opcode);
+        cases += &format!("let funct3 = funct3!(inst);\n");
+        cases += "match funct3 {";
+        for (funct3, op) in funct3s {
+            cases += &format!("0b{} => self.{}(rs1!(inst), rs2!(inst), imm_s!(inst)),\n", funct3, op.to_lowercase());
         }
         cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
         cases += "}},";

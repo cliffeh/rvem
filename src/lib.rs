@@ -52,6 +52,12 @@ macro_rules! imm_j {
     };
 }
 
+macro_rules! imm_s {
+    ($inst:expr) => {
+        (((($inst) >> 25) << 7) | ((($inst) >> 7) & 0b11111))
+    };
+}
+
 macro_rules! sext {
     ($value:expr, $bits:expr) => {
         if (($value) & (1 << (($bits) - 1))) == 0 {
@@ -227,8 +233,8 @@ impl VirtualMachine {
 
     // integer operations
     fn addi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: addi {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
-        self.reg[rd] = self.reg[rs1] + sext!(imm12, 12);
+        log::debug!("{:x} {:08x}: addi {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12) as i32);
+        self.reg[rd] = ((self.reg[rs1] as i32) + (sext!(imm12, 12) as i32)) as u32;
     }
     fn andi(&mut self, rd: usize, rs1: usize, imm12: u32) {
         log::debug!("{:x} {:08x}: andi {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
@@ -337,6 +343,28 @@ impl VirtualMachine {
         self.reg[rd] = self.reg[rs1] ^ self.reg[rs2];
     }
 
+    /* S-Type */
+    fn sb(&mut self, rs1: usize, rs2: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: sb {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
+        // M[x[rs1] + sext(imm[11:0])][7:0] = x[rs2][7:0]
+        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
+    }
+    fn sh(&mut self, rs1: usize, rs2: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: sh {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
+        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
+        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
+    }
+    fn sw(&mut self, rs1: usize, rs2: usize, imm12: u32) {
+        log::debug!("{:x} {:08x}: sw {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
+        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
+        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
+        self.mem[addr + 2] = ((self.reg[rs2] & 0xffff00) << 8) as u8;
+        self.mem[addr + 3] = ((self.reg[rs2] & 0xffffff00) << 8) as u8;
+    }
+
     /* U-Type */
     fn auipc(&mut self, rd: usize, imm20: u32) {
         log::debug!("{:x} {:08x}: auipc {}, 0x{:x}", self.pc, self.curr(), REG_NAMES[rd], imm20);
@@ -352,9 +380,30 @@ impl VirtualMachine {
         log::debug!("{:x} {:08x}: ecall", self.pc, self.curr());
         let syscall = self.reg[R_A7];
         match syscall {
+            1 => {
+                log::trace!("MIPS print_int"); // https://student.cs.uwaterloo.ca/~isg/res/mips/traps
+                println!("{}", (self.reg[R_A0] as i16));
+            }
+            4 => {
+                log::trace!("MIPS print_string");
+                let pos = self.reg[R_A0] as usize;
+                let mut len = 0usize;
+                while self.mem[pos + len] != 0 {
+                    len += 1;
+                }
+
+                println!("{}", String::from_utf8(self.mem[pos..pos + len].into()).unwrap());
+            }
+            5 => {
+                log::trace!("MIPS read_int");
+                let mut buf: String = String::new();
+                // TODO catch error
+                let _ = std::io::stdin().read_line(&mut buf);
+                self.reg[R_A0] = buf.trim().parse::<u32>().unwrap(); // TODO get rid of unwrap
+            }
             64 => {
                 // RISC-V write
-                log::debug!("write syscall: fp: {} addr: {:x} len: {}", self.reg[R_A0], self.reg[R_A1], self.reg[R_A2]);
+                log::debug!("RISC-V linux write syscall: fp: {} addr: {:x} len: {}", self.reg[R_A0], self.reg[R_A1], self.reg[R_A2]);
 
                 let mut fp = unsafe { File::from_raw_fd(self.reg[R_A0] as i32) };
                 let addr = self.reg[R_A1] as usize;
@@ -369,7 +418,7 @@ impl VirtualMachine {
             }
             93 => {
                 // RISC-V exit
-                log::trace!("exit syscall: rc: {}", self.reg[R_A0]);
+                log::trace!("RISC-V linux exit syscall: rc: {}", self.reg[R_A0]);
                 process::exit(self.reg[R_A0] as i32);
             }
             _ => {
