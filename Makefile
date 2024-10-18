@@ -1,4 +1,4 @@
-PROGS=hello fib1 fib2 strlen
+PROGS=hello fib1 strlen
 DEFAULT_PROG=hello
 PROG?=$(DEFAULT_PROG)
 
@@ -36,6 +36,9 @@ dumpall: $(PROG)  ## disassemble all sections
 	$(ASPREFIX)-objdump -D tests/data/$<
 .PHONY: dump
 
+readelf: $(PROG)  ## display ELF information
+	$(ASPREFIX)-readelf -a tests/data/$<
+.PHONY: readelf
 
 ### targets that actually build things
 $(PROGS): %: tests/data/%.o
@@ -79,7 +82,6 @@ help: ## show this help
 	@echo
 	@printf "  \033[0;36m%-10s\033[m %s\n" hello "(default) your bog standard \"Hello, World!\" program"
 	@printf "  \033[0;36m%-10s\033[m %s\n" fib1 "computes the Fibonacci sequence up to fib(42)"
-	@printf "  \033[0;36m%-10s\033[m %s\n" fib2 "computes the Fibonacci sequence to a number of your choice"
 	@printf "  \033[0;36m%-10s\033[m %s\n" strlen "computes the length of \"The quick brown fox jumps over the lazy dog.\""
 	@echo ""
 	@echo "Examples:"

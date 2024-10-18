@@ -147,7 +147,9 @@ impl VirtualMachine {
                 );
                 self.mem[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
                 if section.is_executable() {
+                    // initialize the program counter and stack pointer
                     self.pc = section.sh_addr as usize;
+                    self.reg[R_SP] = section.sh_addr as u32;
                 }
             }
         }
@@ -164,7 +166,7 @@ impl VirtualMachine {
         }
 
         // initialize the stack pointer
-        self.reg[R_SP] = self.reg.len() as u32; // TODO find a better way to do this
+        // self.reg[R_SP] = self.reg.len() as u32; // TODO find a better way to do this
 
         Ok(())
     }
@@ -275,6 +277,11 @@ impl VirtualMachine {
     fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
         log::debug!("{:x} {:08x}: lw {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
+        log::trace!("loading word from address: {:x} into {}", addr, REG_NAMES[rd]);
+        let word = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
+        log::trace!("that word is: {:x}", word);
+        log::trace!("the bytes are: {:x} {:x} {:x} {:x}", self.mem[addr], self.mem[addr+1], self.mem[addr+2], self.mem[addr+3]);
+        self.memdump("memdump ");
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
@@ -291,9 +298,10 @@ impl VirtualMachine {
 
     // jump
     fn jalr(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: jalr 0x{:x}", self.pc, self.curr(), self.reg[rs1] + sext!(imm12, 12));
+        let addr = self.reg[rs1] + sext!(imm12, 12);
+        log::debug!("{:x} {:08x}: jalr 0x{:x}", self.pc, self.curr(), addr);
         self.reg[rd] = self.pc as u32 + 4;
-        self.pc = (self.reg[rs1] + sext!(imm12, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+        self.pc = (addr - 4) as usize; // NB subtract 4 since we're auto-incrementing
     }
 
     /* J-Type */
@@ -354,6 +362,7 @@ impl VirtualMachine {
         self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
     }
     fn sh(&mut self, rs1: usize, rs2: usize, imm12: u32) {
+        // M[x[rs1] + sext(imm[11:0])][15:0] = x[rs2][15:0]
         log::debug!("{:x} {:08x}: sh {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
@@ -361,6 +370,8 @@ impl VirtualMachine {
     }
     fn sw(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         log::debug!("{:x} {:08x}: sw {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
+        // sw rs2, imm(rs1) - e.g., sw ra, 8(sp)
+        // M[x[rs1] + sext(imm[11:0])][31:0] = x[rs2][31:0]
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
         self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
