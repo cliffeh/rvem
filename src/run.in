@@ -2,7 +2,7 @@ impl VirtualMachine {
     pub fn run(&mut self) {
         while self.mem[self.pc] != 0 {
             let inst = self.curr();
-            let opcode = inst & 0b1111111;
+            let opcode = opcode!(inst);
             match opcode {
                 /* CASES */
                 // TODO implement other environment calls
