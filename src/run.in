@@ -1,6 +1,9 @@
 impl VirtualMachine {
     pub fn run(&mut self) {
         while self.mem[self.pc] != 0 {
+            // we'll just reset to zero each iteration rather than blocking writes
+            self.reg[0] = 0;
+            self.regdump();
             let inst = self.curr();
             let opcode = opcode!(inst);
             match opcode {

@@ -22,15 +22,15 @@ macro_rules! rs1 {
     };
 }
 
-macro_rules! funct3 {
-    ($inst:expr) => {
-        (($inst >> 12) & 0b111)
-    };
-}
-
 macro_rules! rs2 {
     ($inst:expr) => {
         ((($inst >> 20) & 0b1_1111) as usize)
+    };
+}
+
+macro_rules! funct3 {
+    ($inst:expr) => {
+        (($inst >> 12) & 0b111)
     };
 }
 
@@ -173,6 +173,14 @@ impl VirtualMachine {
             }
             i += 1;
         }
+    }
+
+    pub fn regdump(&self) {
+        let mut s = String::new();
+        for i in 0..self.reg.len() {
+            s += &format!("{}: {} ", REG_NAMES[i], self.reg[i]);
+        }
+        log::trace!("{}", s);
     }
 }
 
