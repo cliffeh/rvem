@@ -28,4 +28,4 @@ strlen:
     .data
 
 s:
-    .asciz   "hello, world!"
+    .asciz   "The quick brown fox jumps over the lazy dog."

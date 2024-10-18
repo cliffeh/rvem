@@ -1,6 +1,6 @@
         .data
 n:
-        .word  11
+        .word  42
         .text
         .globl _start
 
