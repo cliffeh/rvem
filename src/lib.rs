@@ -157,11 +157,14 @@ impl VirtualMachine {
             match sym_name {
                 Some(GLOBAL_POINTER_SYMNAME) => {
                     log::debug!("found global pointer address: 0x{:x}", sym.st_value);
-                    self.reg[3/*Reg::Gp*/] = sym.st_value as u32;
+                    self.reg[R_GP] = sym.st_value as u32;
                 }
                 _ => {}
             }
         }
+
+        // initialize the stack pointer
+        self.reg[R_SP] = self.reg.len() as u32; // TODO find a better way to do this
 
         Ok(())
     }
@@ -383,6 +386,7 @@ impl VirtualMachine {
             1 => {
                 log::trace!("MIPS print_int"); // https://student.cs.uwaterloo.ca/~isg/res/mips/traps
                 println!("{}", (self.reg[R_A0] as i16));
+                std::io::stdout().flush().unwrap();
             }
             4 => {
                 log::trace!("MIPS print_string");
@@ -392,7 +396,8 @@ impl VirtualMachine {
                     len += 1;
                 }
 
-                println!("{}", String::from_utf8(self.mem[pos..pos + len].into()).unwrap());
+                print!("{}", String::from_utf8(self.mem[pos..pos + len].into()).unwrap());
+                std::io::stdout().flush().unwrap();
             }
             5 => {
                 log::trace!("MIPS read_int");
