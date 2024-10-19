@@ -1,6 +1,8 @@
 use goblin::elf::Elf;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::ops::Range;
 use std::os::fd::FromRawFd;
 use std::process;
 
@@ -115,18 +117,20 @@ pub struct VirtualMachine {
     pub pc: usize,
     pub reg: [u32; 32],
     pub mem: Vec<u8>,
+    pub sections: HashMap<String, Range<usize>>,
 }
 
 impl VirtualMachine {
-    pub fn new(alloc: usize) -> VirtualMachine {
+    pub fn new(alloc: Option<usize>) -> VirtualMachine {
         VirtualMachine {
             pc: 0x0,
             reg: [0u32; 32],
-            mem: vec![0u8; alloc],
+            mem: vec![0u8; if let Some(n) = alloc { n } else { DEFAULT_MEMORY_SIZE }],
+            sections: HashMap::new(),
         }
     }
 
-    pub fn load_from(path: &str, alloc: usize) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
+    pub fn load_from(path: &str, alloc: Option<usize>) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
         let mut vm = VirtualMachine::new(alloc);
         vm.load(path)?;
         Ok(vm)
@@ -141,14 +145,10 @@ impl VirtualMachine {
 
         for section in &elf.section_headers {
             if section.is_alloc() {
-                // TODO get rid of unwraps
-                log::debug!(
-                    "found section: {}; address: 0x{:x}, length: {} bytes",
-                    elf.shdr_strtab.get_at(section.sh_name).unwrap(),
-                    section.sh_addr,
-                    section.sh_size
-                );
+                let name = elf.shdr_strtab.get_at(section.sh_name).unwrap().to_string();
+                log::debug!("found section: {}; address: 0x{:x}, length: {} bytes", name, section.sh_addr, section.sh_size);
                 self.mem[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
+                self.sections.insert(name, section.vm_range());
             }
         }
 
@@ -202,7 +202,18 @@ impl Default for VirtualMachine {
             pc: Default::default(),
             reg: Default::default(),
             mem: vec![0u8; DEFAULT_MEMORY_SIZE],
+            sections: HashMap::new(),
         }
+    }
+}
+
+impl std::fmt::Debug for VirtualMachine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "program counter: {:08x}\n", self.pc)?;
+        for i in 0..self.reg.len() {
+            write!(f, "{}: 0x{:x} ", REG_NAMES[i], self.reg[i])?;
+        }
+        Ok(())
     }
 }
 

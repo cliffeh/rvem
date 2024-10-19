@@ -12,3 +12,4 @@
 * the Makefile is nice - is there a more "rust-y" way to do it?
   * ...and do I give a fuck?
 * assembler?
+* implement my own error type?
