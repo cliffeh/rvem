@@ -108,23 +108,25 @@ pub const R_T4: usize = 29; /*  temporary register 4              */
 pub const R_T5: usize = 30; /*  temporary register 5              */
 pub const R_T6: usize = 31; /*  temporary register 6              */
 
+pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
+
 pub struct VirtualMachine {
     pub pc: usize,
     pub reg: [u32; 32],
-    pub mem: [u8; 1 << 20],
+    pub mem: Vec<u8>,
 }
 
 impl VirtualMachine {
-    pub fn new() -> VirtualMachine {
+    pub fn new(alloc: usize) -> VirtualMachine {
         VirtualMachine {
             pc: 0x0,
             reg: [0u32; 32],
-            mem: [0u8; 1 << 20],
+            mem: vec![0u8; alloc],
         }
     }
 
-    pub fn load_from(path: &str) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
-        let mut vm = VirtualMachine::new();
+    pub fn load_from(path: &str, alloc: usize) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
+        let mut vm = VirtualMachine::new(alloc);
         vm.load(path)?;
         Ok(vm)
     }
@@ -192,6 +194,16 @@ impl VirtualMachine {
             s += &format!("{}: 0x{:x} ", REG_NAMES[i], self.reg[i]);
         }
         log::trace!("{}", s);
+    }
+}
+
+impl Default for VirtualMachine {
+    fn default() -> Self {
+        Self {
+            pc: Default::default(),
+            reg: Default::default(),
+            mem: vec![0u8; DEFAULT_MEMORY_SIZE],
+        }
     }
 }
 
@@ -280,7 +292,7 @@ impl VirtualMachine {
         log::trace!("loading word from address: {:x} into {}", addr, REG_NAMES[rd]);
         let word = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
         log::trace!("that word is: {:x}", word);
-        log::trace!("the bytes are: {:x} {:x} {:x} {:x}", self.mem[addr], self.mem[addr+1], self.mem[addr+2], self.mem[addr+3]);
+        log::trace!("the bytes are: {:x} {:x} {:x} {:x}", self.mem[addr], self.mem[addr + 1], self.mem[addr + 2], self.mem[addr + 3]);
         self.memdump("memdump ");
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
