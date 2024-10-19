@@ -68,6 +68,7 @@ macro_rules! sext {
     };
 }
 
+const ENTRYPOINT_SYMNAME: &str = "_start";
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 const REG_NAMES: [&str; 32] = [
     "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6",
@@ -148,11 +149,6 @@ impl VirtualMachine {
                     section.sh_size
                 );
                 self.mem[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
-                if section.is_executable() {
-                    // initialize the program counter and stack pointer
-                    self.pc = section.sh_addr as usize;
-                    self.reg[R_SP] = section.sh_addr as u32;
-                }
             }
         }
 
@@ -163,12 +159,15 @@ impl VirtualMachine {
                     log::debug!("found global pointer address: 0x{:x}", sym.st_value);
                     self.reg[R_GP] = sym.st_value as u32;
                 }
+                Some(ENTRYPOINT_SYMNAME) => {
+                    log::debug!("found entrypoint: 0x{:x}", sym.st_value);
+                    self.pc = sym.st_value as usize;
+                    // TODO is this where we want the stack pointer to live?
+                    self.reg[R_SP] = sym.st_value as u32;
+                }
                 _ => {}
             }
         }
-
-        // initialize the stack pointer
-        // self.reg[R_SP] = self.reg.len() as u32; // TODO find a better way to do this
 
         Ok(())
     }

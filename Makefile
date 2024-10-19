@@ -16,7 +16,7 @@ endif
 
 default: help
 
-run: $(PROG)  ## run rvem
+run: $(PROG)  ## emulate a RISC-V program
 	cargo run -- tests/data/$<
 .PHONY: hello
 
@@ -39,6 +39,10 @@ dumpall: $(PROG)  ## disassemble all sections
 readelf: $(PROG)  ## display ELF information
 	$(ASPREFIX)-readelf -a tests/data/$<
 .PHONY: readelf
+
+check: $(PROGS)  ## emulate all programs (TODO: check for expected output)
+	for prog in $^; do cargo run -- tests/data/$$prog; done
+.PHONY: check
 
 ### targets that actually build things
 $(PROGS): %: tests/data/%.o
@@ -76,7 +80,7 @@ help: ## show this help
 	@echo "Available environment variables:"
 	@echo
 	@printf "  \033[0;36m%-10s\033[m %s\n" RUST_LOG "sets log level (debug, trace, error)"
-	@printf "  \033[0;36m%-10s\033[m %s\n" PROG "set the program to run"
+	@printf "  \033[0;36m%-10s\033[m %s\n" PROG "sets the program to run"
 	@echo
 	@echo "Available programs:"
 	@echo
@@ -87,6 +91,6 @@ help: ## show this help
 	@echo "Examples:"
 	@echo
 	@printf "  \033[0;36m%-22s\033[m %s\n" "make run" "builds and runs 'hello'"
-	@printf "  \033[0;36m%-22s\033[m %s\n" "PROG=fib1 make trace" "builds and runs 'fib' with trace logging turned on"
+	@printf "  \033[0;36m%-22s\033[m %s\n" "PROG=fib1 make trace" "builds and runs 'fib1' with trace logging turned on"
 	@printf "  \033[0;36m%-22s\033[m %s\n" "PROG=strlen make dump" "dumps the executable section of \`strlen\`"
 .PHONY: help
