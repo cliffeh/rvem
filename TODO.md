@@ -9,9 +9,6 @@
 * github CI workflows for build/test
   * this could be tough (would require risc-v tools)
     * maybe check in binaries?
-* re-organize code so the examples aren't in the main project dir?
 * the Makefile is nice - is there a more "rust-y" way to do it?
   * ...and do I give a fuck?
-* fix whatever is broken with jalr/unsigned addition?
-  * make fib work ffs
-
+* assembler?
