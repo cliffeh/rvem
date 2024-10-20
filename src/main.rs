@@ -32,12 +32,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let mut vm: VirtualMachine = VirtualMachine::load_from(&args.file, Some(args.memory))?;
-    log::debug!("start address: 0x{:x}", vm.pc);
 
-    if let Ok(value) = env::var("RUST_LOG") {
-        if value.to_lowercase() == "trace".to_string() {
-            vm.memdump("memdump: ");
-        }
+    if log::log_enabled!(log::Level::Trace) {
+        log::trace!("{:#?}", vm);
     }
 
     vm.run();

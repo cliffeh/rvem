@@ -1,7 +1,7 @@
 use goblin::elf::Elf;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::ops::Range;
 use std::os::fd::FromRawFd;
 use std::process;
@@ -118,6 +118,7 @@ pub struct VirtualMachine {
     pub reg: [u32; 32],
     pub mem: Vec<u8>,
     pub sections: HashMap<String, Range<usize>>,
+    pub symtab: HashMap<String, usize>,
 }
 
 impl VirtualMachine {
@@ -127,6 +128,7 @@ impl VirtualMachine {
             reg: [0u32; 32],
             mem: vec![0u8; if let Some(n) = alloc { n } else { DEFAULT_MEMORY_SIZE }],
             sections: HashMap::new(),
+            symtab: HashMap::new(),
         }
     }
 
@@ -153,20 +155,26 @@ impl VirtualMachine {
         }
 
         for sym in elf.syms.iter() {
-            let sym_name = elf.strtab.get_at(sym.st_name);
-            match sym_name {
-                Some(GLOBAL_POINTER_SYMNAME) => {
-                    log::debug!("found global pointer address: 0x{:x}", sym.st_value);
-                    self.reg[R_GP] = sym.st_value as u32;
-                }
-                Some(ENTRYPOINT_SYMNAME) => {
-                    log::debug!("found entrypoint: 0x{:x}", sym.st_value);
-                    self.pc = sym.st_value as usize;
-                    // TODO is this where we want the stack pointer to live?
-                    self.reg[R_SP] = sym.st_value as u32;
-                }
-                _ => {}
+            if let Some(name) = elf.strtab.get_at(sym.st_name) {
+                self.symtab.insert(name.into(), sym.st_value as usize);
             }
+        }
+
+        if let Some(gp) = self.symtab.get(GLOBAL_POINTER_SYMNAME) {
+            log::debug!("global pointer address: 0x{:x}", gp);
+            self.reg[R_GP] = *gp as u32;
+        } else {
+            log::warn!("global pointer address not found");
+        }
+
+        if let Some(pc) = self.symtab.get(ENTRYPOINT_SYMNAME) {
+            log::debug!("program entrypoint: 0x{:x}", pc);
+            self.pc = *pc;
+        } else if let Some(range) = self.sections.get(".text") {
+            log::warn!("program entrypoint {} not found; falling back to beginning of .text section: {:x}", ENTRYPOINT_SYMNAME, range.start);
+            self.pc = range.start;
+        } else {
+            return Err(Box::new(io::Error::new(io::ErrorKind::InvalidData, "program entrypoint could not be determined")));
         }
 
         Ok(())
@@ -176,24 +184,6 @@ impl VirtualMachine {
         // TODO get rid of unwrap
         u32::from_le_bytes(self.mem[self.pc..self.pc + 4].try_into().unwrap())
     }
-
-    pub fn memdump(&self, prefix: &str) {
-        let mut i: usize = 0;
-        for value in self.mem.iter() {
-            if *value != 0 {
-                log::trace!("{}{:x}: {:02x}", prefix, i, value);
-            }
-            i += 1;
-        }
-    }
-
-    pub fn regdump(&self) {
-        let mut s = String::new();
-        for i in 0..self.reg.len() {
-            s += &format!("{}: 0x{:x} ", REG_NAMES[i], self.reg[i]);
-        }
-        log::trace!("{}", s);
-    }
 }
 
 impl Default for VirtualMachine {
@@ -202,16 +192,41 @@ impl Default for VirtualMachine {
             pc: Default::default(),
             reg: Default::default(),
             mem: vec![0u8; DEFAULT_MEMORY_SIZE],
-            sections: HashMap::new(),
+            sections: Default::default(),
+            symtab: Default::default(),
         }
     }
 }
 
 impl std::fmt::Debug for VirtualMachine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "program counter: {:08x}\n", self.pc)?;
+        // default behavior: dump registers
         for i in 0..self.reg.len() {
             write!(f, "{}: 0x{:x} ", REG_NAMES[i], self.reg[i])?;
+        }
+
+        // alternate behavior: also dump all sections in memory
+        if f.alternate() {
+            writeln!(f, "")?;
+            if let Some(range) = self.sections.get(".text") {
+                writeln!(f, ".text:")?;
+                let mut i = range.start;
+                while i < range.end {
+                    let inst = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
+                    writeln!(f, "  {:x}: {:08x}", i, inst)?;
+                    i += 4;
+                }
+            }
+            for (name, range) in &self.sections {
+                if name != ".text" {
+                    writeln!(f, "{name}")?;
+                    let mut i = range.start;
+                    while i < range.end {
+                        writeln!(f, "  {:x}: {:02x}", i, self.mem[i])?;
+                        i += 1;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -299,11 +314,6 @@ impl VirtualMachine {
     fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
         log::debug!("{:x} {:08x}: lw {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
-        log::trace!("loading word from address: {:x} into {}", addr, REG_NAMES[rd]);
-        let word = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
-        log::trace!("that word is: {:x}", word);
-        log::trace!("the bytes are: {:x} {:x} {:x} {:x}", self.mem[addr], self.mem[addr + 1], self.mem[addr + 2], self.mem[addr + 3]);
-        self.memdump("memdump ");
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
@@ -445,7 +455,7 @@ impl VirtualMachine {
             }
             64 => {
                 // RISC-V write
-                log::debug!("RISC-V linux write syscall: fp: {} addr: {:x} len: {}", self.reg[R_A0], self.reg[R_A1], self.reg[R_A2]);
+                log::trace!("RISC-V linux write syscall: fp: {} addr: {:x} len: {}", self.reg[R_A0], self.reg[R_A1], self.reg[R_A2]);
 
                 let mut fp = unsafe { File::from_raw_fd(self.reg[R_A0] as i32) };
                 let addr = self.reg[R_A1] as usize;

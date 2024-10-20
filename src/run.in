@@ -3,8 +3,11 @@ impl VirtualMachine {
         while self.mem[self.pc] != 0 {
             // we'll just reset to zero each iteration rather than blocking writes
             self.reg[0] = 0;
-            // TODO only do this if we're in trace mode
-            self.regdump();
+            
+            if log::log_enabled!(log::Level::Trace) {
+                println!("{self:?}");
+            }
+            
             let inst = self.curr();
             let opcode = opcode!(inst);
             match opcode {
