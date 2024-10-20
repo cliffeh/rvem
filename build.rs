@@ -137,5 +137,5 @@ fn main() {
 
     fs::write(&dest_path, format!("{preamble} {cases} {postamble}")).unwrap();
     println!("cargo::rerun-if-changed=src/lib.rs");
-    println!("cargo::rerun-if-changed=src/rv32i.tab.rs");
+    println!("cargo::rerun-if-changed=src/rv32i.tab");
 }
