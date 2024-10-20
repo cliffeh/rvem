@@ -171,6 +171,24 @@ impl std::fmt::Debug for VirtualMachine {
 }
 
 impl VirtualMachine {
+    pub fn run(&mut self) {
+        while self.mem[self.pc] != 0 {
+            // we'll just reset to zero each iteration rather than blocking writes
+            self.reg[0] = 0;
+
+            if log::log_enabled!(log::Level::Trace) {
+                println!("{self:?}");
+            }
+
+            let inst = self.curr();
+            let opcode = opcode!(inst);
+
+            include!(concat!(env!("OUT_DIR"), "/rv32i.rs"));
+
+            self.pc += 4;
+        }
+    }
+
     /* B-Type (branches) */
     fn beq(&mut self, rs1: usize, rs2: usize, imm13: u32) {
         log::debug!("{:x} {:08x}: beq {}, {}, {:x}", self.pc, self.curr(), REG_NAMES[rs1], REG_NAMES[rs2], sext!(imm13, 12) + self.pc as u32);
@@ -491,5 +509,3 @@ macro_rules! sext {
         }
     };
 }
-
-include!(concat!(env!("OUT_DIR"), "/rv32i.rs"));

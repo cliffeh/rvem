@@ -10,15 +10,14 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("rv32i.rs");
 
-    let template_path = Path::new("src/run.in");
-    let template = read_to_string(template_path).unwrap();
-
     let mut cases = String::new();
 
     let mut btype: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut itype: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut rtype: HashMap<String, HashMap<String, HashMap<String, String>>> = HashMap::new();
     let mut stype: HashMap<String, HashMap<String, String>> = HashMap::new();
+
+    let preamble = r#"match opcode {"#;
 
     for line in read_to_string("src/rv32i.tab").unwrap().lines() {
         let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
@@ -124,6 +123,19 @@ fn main() {
         cases += "}},";
     }
 
-    fs::write(&dest_path, template.replace("/* CASES */", &cases)).unwrap();
-    println!("cargo::rerun-if-changed=src/");
+    let postamble = r#"0b1110011 => {
+                    if inst == 0b1110011 { // ECALL
+                        self.ecall();
+                    } else {
+                        log::error!("{:x} {:08x}: unimplemented environment call", self.pc, inst);
+                    }
+                }
+                _ => {
+                    log::error!("{:x} {:08x}: unimplemented opcode: {:07b}", self.pc, inst, opcode);
+                }
+            }"#;
+
+    fs::write(&dest_path, format!("{preamble} {cases} {postamble}")).unwrap();
+    println!("cargo::rerun-if-changed=src/lib.rs");
+    println!("cargo::rerun-if-changed=src/rv32i.tab.rs");
 }
