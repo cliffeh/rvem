@@ -6,70 +6,6 @@ use std::ops::Range;
 use std::os::fd::FromRawFd;
 use std::process;
 
-macro_rules! opcode {
-    ($inst:expr) => {
-        ($inst) & 0b111_1111
-    };
-}
-
-macro_rules! rd {
-    ($inst:expr) => {
-        ((($inst >> 7) & 0b1_1111) as usize)
-    };
-}
-
-macro_rules! rs1 {
-    ($inst:expr) => {
-        ((($inst >> 15) & 0b1_1111) as usize)
-    };
-}
-
-macro_rules! rs2 {
-    ($inst:expr) => {
-        ((($inst >> 20) & 0b1_1111) as usize)
-    };
-}
-
-macro_rules! funct3 {
-    ($inst:expr) => {
-        (($inst >> 12) & 0b111)
-    };
-}
-
-macro_rules! funct7 {
-    ($inst:expr) => {
-        (($inst >> 25) & 0b111_1111)
-    };
-}
-
-macro_rules! imm_b {
-    ($inst:expr) => {
-        ((((($inst) >> 31) & 0x1) << 12) | (((($inst) >> 7) & 0b1) << 11) | (((($inst) >> 25) & 0b111111) << 5) | (((($inst) >> 8) & 0b1111) << 1))
-    };
-}
-
-macro_rules! imm_j {
-    ($inst:expr) => {
-        ((((($inst) >> 31) & 0b1) << 20) | (((($inst) >> 12) & 0b11111111) << 12) | (((($inst) >> 20) & 0b1) << 11) | (((($inst) >> 21) & 0b1111111111) << 1))
-    };
-}
-
-macro_rules! imm_s {
-    ($inst:expr) => {
-        (((($inst) >> 25) << 7) | ((($inst) >> 7) & 0b11111))
-    };
-}
-
-macro_rules! sext {
-    ($value:expr, $bits:expr) => {
-        if (($value) & (1 << (($bits) - 1))) == 0 {
-            $value
-        } else {
-            (($value) | (0xffffffff << ($bits)))
-        }
-    };
-}
-
 const ENTRYPOINT_SYMNAME: &str = "_start";
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 const REG_NAMES: [&str; 32] = [
@@ -181,8 +117,11 @@ impl VirtualMachine {
     }
 
     pub fn curr(&self) -> u32 {
-        // TODO get rid of unwrap
-        u32::from_le_bytes(self.mem[self.pc..self.pc + 4].try_into().unwrap())
+        self.inst(self.pc)
+    }
+
+    pub fn inst(&self, addr: usize) -> u32 {
+        u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap())
     }
 }
 
@@ -207,22 +146,21 @@ impl std::fmt::Debug for VirtualMachine {
 
         // alternate behavior: also dump all sections in memory
         if f.alternate() {
-            writeln!(f, "")?;
             if let Some(range) = self.sections.get(".text") {
-                writeln!(f, ".text:")?;
+                write!(f, "\n.text:")?;
                 let mut i = range.start;
                 while i < range.end {
                     let inst = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
-                    writeln!(f, "  {:x}: {:08x}", i, inst)?;
+                    write!(f, "\n  {:x}: {:08x}", i, inst)?;
                     i += 4;
                 }
             }
             for (name, range) in &self.sections {
                 if name != ".text" {
-                    writeln!(f, "{name}")?;
+                    write!(f, "\n{name}")?;
                     let mut i = range.start;
                     while i < range.end {
-                        writeln!(f, "  {:x}: {:02x}", i, self.mem[i])?;
+                        write!(f, "\n  {:x}: {:02x}", i, self.mem[i])?;
                         i += 1;
                     }
                 }
@@ -478,6 +416,80 @@ impl VirtualMachine {
             }
         }
     }
+}
+
+#[macro_export]
+macro_rules! opcode {
+    ($inst:expr) => {
+        ($inst) & 0b111_1111
+    };
+}
+
+#[macro_export]
+macro_rules! rd {
+    ($inst:expr) => {
+        ((($inst >> 7) & 0b1_1111) as usize)
+    };
+}
+
+#[macro_export]
+macro_rules! rs1 {
+    ($inst:expr) => {
+        ((($inst >> 15) & 0b1_1111) as usize)
+    };
+}
+
+#[macro_export]
+macro_rules! rs2 {
+    ($inst:expr) => {
+        ((($inst >> 20) & 0b1_1111) as usize)
+    };
+}
+
+#[macro_export]
+macro_rules! funct3 {
+    ($inst:expr) => {
+        (($inst >> 12) & 0b111)
+    };
+}
+
+#[macro_export]
+macro_rules! funct7 {
+    ($inst:expr) => {
+        (($inst >> 25) & 0b111_1111)
+    };
+}
+
+#[macro_export]
+macro_rules! imm_b {
+    ($inst:expr) => {
+        ((((($inst) >> 31) & 0x1) << 12) | (((($inst) >> 7) & 0b1) << 11) | (((($inst) >> 25) & 0b111111) << 5) | (((($inst) >> 8) & 0b1111) << 1))
+    };
+}
+
+#[macro_export]
+macro_rules! imm_j {
+    ($inst:expr) => {
+        ((((($inst) >> 31) & 0b1) << 20) | (((($inst) >> 12) & 0b11111111) << 12) | (((($inst) >> 20) & 0b1) << 11) | (((($inst) >> 21) & 0b1111111111) << 1))
+    };
+}
+
+#[macro_export]
+macro_rules! imm_s {
+    ($inst:expr) => {
+        (((($inst) >> 25) << 7) | ((($inst) >> 7) & 0b11111))
+    };
+}
+
+#[macro_export]
+macro_rules! sext {
+    ($value:expr, $bits:expr) => {
+        if (($value) & (1 << (($bits) - 1))) == 0 {
+            $value
+        } else {
+            (($value) | (0xffffffff << ($bits)))
+        }
+    };
 }
 
 include!(concat!(env!("OUT_DIR"), "/rv32i.rs"));
