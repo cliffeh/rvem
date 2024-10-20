@@ -8,9 +8,11 @@ use std::path::Path;
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("rv32i.rs");
+    let exec_path = Path::new(&out_dir).join("exec.rs");
+    let _debug_path = Path::new(&out_dir).join("debug.rs"); // TODO
 
-    let mut cases = String::new();
+    let mut exec_cases = String::new();
+    let mut debug_cases = String::new();
 
     let mut btype: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut itype: HashMap<String, HashMap<String, String>> = HashMap::new();
@@ -39,7 +41,8 @@ fn main() {
             // imm[20|10:1|11|19:12] rd 1101111 JAL
             "imm[20|10:1|11|19:12]" => {
                 // J-Type
-                cases += &format!("0b{} => self.{}(rd!(inst), imm_j!(inst)),\n", pieces[2], pieces[3].to_lowercase());
+                exec_cases += &format!("0b{} => self.{}(rd!(inst), imm_j!(inst)),\n", pieces[2], pieces[3].to_lowercase());
+                debug_cases += &format!("0b{} => log::debug!({}),", pieces[2], pieces[3].to_lowercase());
             }
             // 0000000 rs2 rs1 000 rd 0110011 ADD
             "0000000" | "0100000" => {
@@ -61,7 +64,7 @@ fn main() {
             // imm[31:12] rd 0110111 LUI
             "imm[31:12]" => {
                 // U-Type
-                cases += &format!("0b{} => self.{}(rd!(inst), inst >> 12),\n", pieces[2], pieces[3].to_lowercase());
+                exec_cases += &format!("0b{} => self.{}(rd!(inst), inst >> 12),\n", pieces[2], pieces[3].to_lowercase());
             }
             // TODO is there a way to output build warnings about ignored lines?
             _ => {}
@@ -70,60 +73,60 @@ fn main() {
 
     // B-Type
     for (opcode, subcodes) in btype {
-        cases += &format!("0b{} => {{\n", opcode);
-        cases += &format!("let funct3 = funct3!(inst);\n");
-        cases += "match funct3 {";
+        exec_cases += &format!("0b{} => {{\n", opcode);
+        exec_cases += &format!("let funct3 = funct3!(inst);\n");
+        exec_cases += "match funct3 {";
         for (funct3, op) in subcodes {
-            cases += &format!("0b{} => self.{}(rs1!(inst), rs2!(inst), imm_b!(inst)),\n", funct3, op.to_lowercase());
+            exec_cases += &format!("0b{} => self.{}(rs1!(inst), rs2!(inst), imm_b!(inst)),\n", funct3, op.to_lowercase());
         }
-        cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        cases += "}},";
+        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
+        exec_cases += "}},";
     }
 
     // I-Type
     for (opcode, funct3s) in itype {
-        cases += &format!("0b{} => {{\n", opcode);
-        cases += &format!("let funct3 = funct3!(inst);\n");
-        cases += "match funct3 {";
+        exec_cases += &format!("0b{} => {{\n", opcode);
+        exec_cases += &format!("let funct3 = funct3!(inst);\n");
+        exec_cases += "match funct3 {";
         for (funct3, op) in funct3s {
-            cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), inst >> 20),\n", funct3, op.to_lowercase());
+            exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), inst >> 20),\n", funct3, op.to_lowercase());
         }
-        cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        cases += "}},";
+        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
+        exec_cases += "}},";
     }
 
     // R-Type
     for (opcode, funct3s) in rtype {
-        cases += &format!("0b{} => {{\n", opcode);
-        cases += &format!("let funct3 = funct3!(inst);\n");
-        cases += "match funct3 {";
+        exec_cases += &format!("0b{} => {{\n", opcode);
+        exec_cases += &format!("let funct3 = funct3!(inst);\n");
+        exec_cases += "match funct3 {";
         for (funct3, funct7s) in funct3s {
-            cases += &format!("0b{} => {{", funct3);
-            cases += &format!("let funct7 = funct7!(inst);\n");
-            cases += "match funct7 {";
+            exec_cases += &format!("0b{} => {{", funct3);
+            exec_cases += &format!("let funct7 = funct7!(inst);\n");
+            exec_cases += "match funct7 {";
             for (funct7, op) in funct7s {
-                cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), rs2!(inst)),\n", funct7, op.to_lowercase());
+                exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), rs2!(inst)),\n", funct7, op.to_lowercase());
             }
-            cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
-            cases += "}},";
+            exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
+            exec_cases += "}},";
         }
-        cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        cases += "}},";
+        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
+        exec_cases += "}},";
     }
 
     // S-Type
     for (opcode, funct3s) in stype {
-        cases += &format!("0b{} => {{\n", opcode);
-        cases += &format!("let funct3 = funct3!(inst);\n");
-        cases += "match funct3 {";
+        exec_cases += &format!("0b{} => {{\n", opcode);
+        exec_cases += &format!("let funct3 = funct3!(inst);\n");
+        exec_cases += "match funct3 {";
         for (funct3, op) in funct3s {
-            cases += &format!("0b{} => self.{}(rs1!(inst), rs2!(inst), imm_s!(inst)),\n", funct3, op.to_lowercase());
+            exec_cases += &format!("0b{} => self.{}(rs1!(inst), rs2!(inst), imm_s!(inst)),\n", funct3, op.to_lowercase());
         }
-        cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        cases += "}},";
+        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
+        exec_cases += "}},";
     }
 
-    let postamble = r#"0b1110011 => {
+    let exec_postamble = r#"0b1110011 => {
                     if inst == 0b1110011 { // ECALL
                         self.ecall();
                     } else {
@@ -135,7 +138,7 @@ fn main() {
                 }
             }"#;
 
-    fs::write(&dest_path, format!("{preamble} {cases} {postamble}")).unwrap();
+    fs::write(&exec_path, format!("{preamble} {exec_cases} {exec_postamble}")).unwrap();
     println!("cargo::rerun-if-changed=src/lib.rs");
     println!("cargo::rerun-if-changed=src/rv32i.tab");
 }

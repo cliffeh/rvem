@@ -183,7 +183,7 @@ impl VirtualMachine {
             let inst = self.curr();
             let opcode = opcode!(inst);
 
-            include!(concat!(env!("OUT_DIR"), "/rv32i.rs"));
+            include!(concat!(env!("OUT_DIR"), "/exec.rs"));
 
             self.pc += 4;
         }
