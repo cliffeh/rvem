@@ -50,12 +50,12 @@ pub const R_T6: usize = 31; /*  temporary register 6              */
 
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
 
+// enum Foo {}
+
 // enum Instruction
 include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 
 impl Instruction {
-    
-
     fn execute(&self, vm: &mut VirtualMachine) -> Result<usize, String> {
         match self {
             /* B-Type (branches) */

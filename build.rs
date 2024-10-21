@@ -1,5 +1,8 @@
 // build.rs
 
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use syn::Ident;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -14,7 +17,7 @@ fn main() {
 
     let mut disasm_cases = String::new();
     let mut decode_cases = String::new();
-    let mut variants = String::new();
+    let mut variants: Vec<TokenStream> = vec![];
 
     let mut btype: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut itype: HashMap<String, HashMap<String, String>> = HashMap::new();
@@ -34,14 +37,16 @@ fn main() {
                 // B-Type
                 let funct3 = btype.entry(pieces[5].into()).or_default();
                 funct3.insert(pieces[3].into(), pieces[6].into());
-                variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
+                let name = format_ident!("{}", pieces[6]);
+                variants.push(quote!{#name{rs1: usize, rs2: usize, imm: u32}});
+                // variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
             }
             // imm[11:0] rs1 000 rd 0010011 ADDI
             "imm[11:0]" => {
                 // I-Type
                 let funct3 = itype.entry(pieces[4].into()).or_default();
                 funct3.insert(pieces[2].into(), pieces[5].into());
-                variants += &format!("{}{{rd: usize, rs1: usize, imm: u32}},\n", pieces[5]);
+                // variants += &format!("{}{{rd: usize, rs1: usize, imm: u32}},\n", pieces[5]);
             }
             // imm[20|10:1|11|19:12] rd 1101111 JAL
             "imm[20|10:1|11|19:12]" => {
@@ -55,7 +60,7 @@ fn main() {
                     pieces[2],
                     pieces[3].to_lowercase()
                 );
-                variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
+                // variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
             }
             // 0000000 rs2 rs1 000 rd 0110011 ADD
             "0000000" | "0100000" => {
@@ -65,12 +70,12 @@ fn main() {
                     let funct3 = shamt.entry(pieces[5].into()).or_default();
                     let funct7 = funct3.entry(pieces[3].into()).or_default();
                     funct7.insert(pieces[0].into(), pieces[6].into());
-                    variants += &format!("{}{{rd: usize, rs1: usize, shamt: u32}},\n", pieces[6]);
+                    // variants += &format!("{}{{rd: usize, rs1: usize, shamt: u32}},\n", pieces[6]);
                 } else {
                     let funct3 = rtype.entry(pieces[5].into()).or_default();
                     let funct7 = funct3.entry(pieces[3].into()).or_default();
                     funct7.insert(pieces[0].into(), pieces[6].into());
-                    variants += &format!("{}{{rd: usize, rs1: usize, rs2: usize}},\n", pieces[6]);
+                    // variants += &format!("{}{{rd: usize, rs1: usize, rs2: usize}},\n", pieces[6]);
                 }
             }
             // imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
@@ -78,7 +83,7 @@ fn main() {
                 // S-Type
                 let funct3 = stype.entry(pieces[5].into()).or_default();
                 funct3.insert(pieces[3].into(), pieces[6].into());
-                variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
+                // variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
             }
             // imm[31:12] rd 0110111 LUI
             "imm[31:12]" => {
@@ -92,7 +97,7 @@ fn main() {
                     pieces[2],
                     pieces[3].to_lowercase()
                 );
-                variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
+                // variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
             }
             // TODO is there a way to output build warnings about ignored lines?
             _ => {}
@@ -262,6 +267,20 @@ fn main() {
                 }
             }"#;
 
+    let mut names: Vec<Ident> = vec![];
+    let vname = format_ident!("Foo");
+    let foo = quote!{Bar};
+    // names.push(vname);
+    // let mut variants: Vec<proc_macro2::TokenStream> = vec![];
+    // variants.push(quote!{#vname{rd: usize}});
+    let output = quote! {
+        pub enum Test {
+           #(#variants),*
+        }
+    };
+    let syntax_tree = syn::parse2(output).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+
     fs::write(
         &decode_path,
         format!("{preamble} {decode_cases} {decode_postamble}"),
@@ -272,11 +291,7 @@ fn main() {
         format!("{preamble} {disasm_cases} {disasm_postamble}"),
     )
     .unwrap();
-    fs::write(
-        &enum_path,
-        format!("#[derive(Debug)] enum Instruction {{ {variants} ECALL, }}"),
-    )
-    .unwrap();
+    fs::write(&enum_path, formatted).unwrap();
     println!("cargo::rerun-if-changed=src/lib.rs");
     println!("cargo::rerun-if-changed=src/rv32i.tab");
 }

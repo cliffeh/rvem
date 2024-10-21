@@ -9,3 +9,13 @@ clap = { version = "4.5.20", features = ["derive"] }
 env_logger = "0.11.5"
 goblin = "0.8.2"
 log = "0.4.22"
+
+
+[build-dependencies]
+proc-macro2 = "1.0.88"
+prettyplease = "0.2.24"
+quote = "1.0.37"
+syn = "2.0.82"
+
+[lib]
+proc-macro = true
