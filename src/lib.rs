@@ -49,6 +49,59 @@ pub const R_T6: usize = 31; /*  temporary register 6              */
 
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
 
+// enum Instruction
+include!(concat!(env!("OUT_DIR"), "/enum.rs"));
+
+impl TryFrom<u32> for Instruction {
+    type Error = String;
+
+    fn try_from(inst: u32) -> Result<Self, Self::Error> {
+        include!(concat!(env!("OUT_DIR"), "/decode.rs"))
+    }
+}
+
+impl Instruction {
+    fn execute(&self, vm: &mut VirtualMachine) -> Result<usize, String> {
+        match self {
+            /* B-Type (branches) */
+            Instruction::BEQ { rs1, rs2, imm } => {
+                if vm.reg[*rs1] as i32 == vm.reg[*rs2] as i32 {
+                    return Ok(vm.pc + sext!(*imm, 12) as usize);
+                }
+            }
+            Instruction::BNE { rs1, rs2, imm } => {
+                if vm.reg[*rs1] as i32 != vm.reg[*rs2] as i32 {
+                    return Ok(vm.pc + sext!(*imm, 12) as usize);
+                }
+            }
+            Instruction::BLT { rs1, rs2, imm } => {
+                if (vm.reg[*rs1] as i32) < (vm.reg[*rs2] as i32) {
+                    return Ok(vm.pc + sext!(*imm, 12) as usize);
+                }
+            }
+            Instruction::BGE { rs1, rs2, imm } => {
+                if vm.reg[*rs1] as i32 >= vm.reg[*rs2] as i32 {
+                    return Ok(vm.pc + sext!(*imm, 12) as usize);
+                }
+            }
+            Instruction::BLTU { rs1, rs2, imm } => {
+                if vm.reg[*rs1] < vm.reg[*rs2] {
+                    return Ok(vm.pc + sext!(*imm, 12) as usize);
+                }
+            }
+            Instruction::BGEU { rs1, rs2, imm } => {
+                if vm.reg[*rs1] >= vm.reg[*rs2] {
+                    return Ok(vm.pc + sext!(*imm, 12) as usize);
+                }
+            }
+            _ => {
+                return Err("unimplemented instruction".to_string());
+            }
+        }
+        Ok(vm.pc + 4)
+    }
+}
+
 pub struct VirtualMachine {
     pub pc: usize,
     pub reg: [u32; 32],
@@ -139,9 +192,10 @@ impl Default for VirtualMachine {
 
 impl std::fmt::Debug for VirtualMachine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // default behavior: dump registers
+        // default behavior: dump PC and registers
+        write!(f, "PC: 0x{:x} ", self.pc)?;
         for i in 0..self.reg.len() {
-            write!(f, "{}: 0x{:x} ", REG_NAMES[i], self.reg[i])?;
+            write!(f, " {}: 0x{:x}", REG_NAMES[i], self.reg[i])?;
         }
 
         // alternate behavior: also dump all sections in memory
@@ -171,7 +225,7 @@ impl std::fmt::Debug for VirtualMachine {
 }
 
 fn disassemble(pc: usize, inst: u32) -> String {
-    let opcode = opcode!(inst);
+    // let opcode = opcode!(inst);
     include!(concat!(env!("OUT_DIR"), "/disasm.rs"))
 }
 
@@ -192,43 +246,11 @@ impl VirtualMachine {
                 log::debug!("{:x}: {:08x} {}", self.pc, inst, disassemble(self.pc, inst))
             }
 
-            let opcode = opcode!(inst);
+            // let opcode = opcode!(inst);
 
             include!(concat!(env!("OUT_DIR"), "/exec.rs"));
 
             self.pc += 4;
-        }
-    }
-
-    /* B-Type (branches) */
-    fn beq(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] == self.reg[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
-        }
-    }
-    fn bne(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] != self.reg[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
-        }
-    }
-    fn blt(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] < self.reg[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
-        }
-    }
-    fn bge(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] >= self.reg[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
-        }
-    }
-    fn bltu(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if (self.reg[rs1] as u32) < (self.reg[rs2] as u32) {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
-        }
-    }
-    fn bgeu(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if (self.reg[rs1] as u32) >= (self.reg[rs2] as u32) {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
 
