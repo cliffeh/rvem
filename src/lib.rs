@@ -151,7 +151,7 @@ impl std::fmt::Debug for VirtualMachine {
                 let mut i = range.start;
                 while i < range.end {
                     let inst = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
-                    write!(f, "\n  {:x}: {:08x}", i, inst)?;
+                    write!(f, "\n  {:x}: {:08x} {}", i, inst, disassemble(i, inst))?;
                     i += 4;
                 }
             }
@@ -168,6 +168,11 @@ impl std::fmt::Debug for VirtualMachine {
         }
         Ok(())
     }
+}
+
+fn disassemble(pc: usize, inst: u32) -> String {
+    let opcode = opcode!(inst);
+    include!(concat!(env!("OUT_DIR"), "/disasm.rs"))
 }
 
 impl VirtualMachine {
