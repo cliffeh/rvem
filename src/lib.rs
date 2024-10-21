@@ -9,8 +9,8 @@ use std::process;
 const ENTRYPOINT_SYMNAME: &str = "_start";
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 const REG_NAMES: [&str; 32] = [
-    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6",
-    "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3",
+    "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
 ];
 
 pub const R_ZERO: usize = 0; /* hardwired to 0, ignores writes    */
@@ -342,6 +342,19 @@ impl VirtualMachine {
         self.reg[rd] = self.reg[rs1] ^ self.reg[rs2];
     }
 
+    fn slli(&mut self, rd: usize, rs1: usize, shamt: usize) {
+        log::debug!("{:x} {:08x}: slli {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], shamt);
+        self.reg[rd] = self.reg[rs1] << shamt;
+    }
+    fn srli(&mut self, rd: usize, rs1: usize, shamt: usize) {
+        log::debug!("{:x} {:08x}: srli {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], shamt);
+        self.reg[rd] = self.reg[rs1] >> shamt;
+    }
+    fn srai(&mut self, rd: usize, rs1: usize, shamt: usize) {
+        log::debug!("{:x} {:08x}: srai {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], shamt);
+        self.reg[rd] = ((self.reg[rs1] as i32) >> shamt) as u32;
+    }
+
     /* S-Type */
     fn sb(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         log::debug!("{:x} {:08x}: sb {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
@@ -481,14 +494,20 @@ macro_rules! funct7 {
 #[macro_export]
 macro_rules! imm_b {
     ($inst:expr) => {
-        ((((($inst) >> 31) & 0x1) << 12) | (((($inst) >> 7) & 0b1) << 11) | (((($inst) >> 25) & 0b111111) << 5) | (((($inst) >> 8) & 0b1111) << 1))
+        ((((($inst) >> 31) & 0x1) << 12)
+            | (((($inst) >> 7) & 0b1) << 11)
+            | (((($inst) >> 25) & 0b111111) << 5)
+            | (((($inst) >> 8) & 0b1111) << 1))
     };
 }
 
 #[macro_export]
 macro_rules! imm_j {
     ($inst:expr) => {
-        ((((($inst) >> 31) & 0b1) << 20) | (((($inst) >> 12) & 0b11111111) << 12) | (((($inst) >> 20) & 0b1) << 11) | (((($inst) >> 21) & 0b1111111111) << 1))
+        ((((($inst) >> 31) & 0b1) << 20)
+            | (((($inst) >> 12) & 0b11111111) << 12)
+            | (((($inst) >> 20) & 0b1) << 11)
+            | (((($inst) >> 21) & 0b1111111111) << 1))
     };
 }
 

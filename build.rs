@@ -16,6 +16,7 @@ fn main() {
 
     let mut btype: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut itype: HashMap<String, HashMap<String, String>> = HashMap::new();
+    let mut shamt: HashMap<String, HashMap<String, HashMap<String, String>>> = HashMap::new();
     let mut rtype: HashMap<String, HashMap<String, HashMap<String, String>>> = HashMap::new();
     let mut stype: HashMap<String, HashMap<String, String>> = HashMap::new();
 
@@ -46,14 +47,17 @@ fn main() {
             }
             // 0000000 rs2 rs1 000 rd 0110011 ADD
             "0000000" | "0100000" => {
-                // R-Type
+                // R-Type/shamt
                 if pieces[1] == "shamt" {
-                    // TODO fucking shamt
-                    continue;
+                    // 0000000 shamt rs1 001 rd 0010011 SLLI
+                    let funct3 = shamt.entry(pieces[5].into()).or_default();
+                    let funct7 = funct3.entry(pieces[3].into()).or_default();
+                    funct7.insert(pieces[0].into(), pieces[6].into());
+                } else {
+                    let funct3 = rtype.entry(pieces[5].into()).or_default();
+                    let funct7 = funct3.entry(pieces[3].into()).or_default();
+                    funct7.insert(pieces[0].into(), pieces[6].into());
                 }
-                let funct3 = rtype.entry(pieces[5].into()).or_default();
-                let funct7 = funct3.entry(pieces[3].into()).or_default();
-                funct7.insert(pieces[0].into(), pieces[6].into());
             }
             // imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
             "imm[11:5]" => {
@@ -91,6 +95,20 @@ fn main() {
         for (funct3, op) in funct3s {
             exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), inst >> 20),\n", funct3, op.to_lowercase());
         }
+        // special case for I-Types w/shamt instead of rs2
+        if let Some(funct3s) = shamt.get(&opcode) {
+            for (funct3, funct7s) in funct3s {
+                exec_cases += &format!("0b{} => {{", funct3);
+                exec_cases += &format!("let funct7 = funct7!(inst);\n");
+                exec_cases += "match funct7 {";
+                for (funct7, op) in funct7s {
+                    exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), rs2!(inst)),\n", funct7, op.to_lowercase());
+                }
+                exec_cases +=
+                    "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
+                exec_cases += "}},";
+            }
+        }
         exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
         exec_cases += "}},";
     }
@@ -107,7 +125,8 @@ fn main() {
             for (funct7, op) in funct7s {
                 exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), rs2!(inst)),\n", funct7, op.to_lowercase());
             }
-            exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
+            exec_cases +=
+                "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
             exec_cases += "}},";
         }
         exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";

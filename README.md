@@ -11,3 +11,4 @@ RISC-V emulator
 * [Assembler Reference](https://michaeljclark.github.io/asm.html)
 * [Instruction Set Reference](https://michaeljclark.github.io/isa)
 * [ISA Specifications](https://riscv.org/technical/specifications/)
+* [RISC-V RV32I assembly with Ripes simulator](https://dantalion.nl/2022/02/25/risc-v-rv32i-assembly.html)
