@@ -9,8 +9,9 @@ use std::process;
 const ENTRYPOINT_SYMNAME: &str = "_start";
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 const REG_NAMES: [&str; 32] = [
-    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3",
-    "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2",
+    "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+    "t3", "t4", "t5", "t6",
 ];
 
 pub const R_ZERO: usize = 0; /* hardwired to 0, ignores writes    */
@@ -52,53 +53,287 @@ pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
 // enum Instruction
 include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 
+impl Instruction {
+    
+
+    fn execute(&self, vm: &mut VirtualMachine) -> Result<usize, String> {
+        match self {
+            /* B-Type (branches) */
+            Instruction::BEQ { rs1, rs2, imm } => Ok(vm.pc
+                + if vm.reg[*rs1] as i32 == vm.reg[*rs2] as i32 {
+                    sext!(*imm, 12) as usize
+                } else {
+                    4
+                }),
+            Instruction::BNE { rs1, rs2, imm } => Ok(vm.pc
+                + if vm.reg[*rs1] as i32 != vm.reg[*rs2] as i32 {
+                    sext!(*imm, 12) as usize
+                } else {
+                    4
+                }),
+            Instruction::BLT { rs1, rs2, imm } => Ok(vm.pc
+                + if (vm.reg[*rs1] as i32) < (vm.reg[*rs2] as i32) {
+                    sext!(*imm, 12) as usize
+                } else {
+                    4
+                }),
+            Instruction::BGE { rs1, rs2, imm } => Ok(vm.pc
+                + if vm.reg[*rs1] as i32 >= vm.reg[*rs2] as i32 {
+                    sext!(*imm, 12) as usize
+                } else {
+                    4
+                }),
+            Instruction::BLTU { rs1, rs2, imm } => Ok(vm.pc
+                + if vm.reg[*rs1] < vm.reg[*rs2] {
+                    sext!(*imm, 12) as usize
+                } else {
+                    4
+                }),
+            Instruction::BGEU { rs1, rs2, imm } => Ok(vm.pc
+                + if vm.reg[*rs1] >= vm.reg[*rs2] {
+                    sext!(*imm, 12) as usize
+                } else {
+                    4
+                }),
+
+            /* I-Type */
+            // integer operations
+            Instruction::ADDI { rd, rs1, imm } => {
+                vm.reg[*rd] = ((vm.reg[*rs1] as i32) + (sext!(*imm, 12) as i32)) as u32;
+                Ok(vm.pc + 4)
+            }
+            Instruction::ANDI { rd, rs1, imm } => {
+                vm.reg[*rd] = ((vm.reg[*rs1] as i32) & (sext!(*imm, 12) as i32)) as u32;
+                Ok(vm.pc + 4)
+            }
+            Instruction::ORI { rd, rs1, imm } => {
+                vm.reg[*rd] = ((vm.reg[*rs1] as i32) | (sext!(*imm, 12) as i32)) as u32;
+                Ok(vm.pc + 4)
+            }
+            Instruction::SLTI { rd, rs1, imm } => {
+                vm.reg[*rd] = if (vm.reg[*rs1] as i32) < (sext!(*imm, 12) as i32) {
+                    1
+                } else {
+                    0
+                };
+                Ok(vm.pc + 4)
+            }
+            Instruction::SLTIU { rd, rs1, imm } => {
+                vm.reg[*rd] = if vm.reg[*rs1] < sext!(*imm, 12) { 1 } else { 0 };
+                Ok(vm.pc + 4)
+            }
+            Instruction::XORI { rd, rs1, imm } => {
+                vm.reg[*rd] = ((vm.reg[*rs1] as i32) ^ (sext!(*imm, 12) as i32)) as u32;
+                Ok(vm.pc + 4)
+            }
+
+            // shamts
+            Instruction::SLLI { rd, rs1, shamt } => {
+                vm.reg[*rd] = vm.reg[*rs1] << *shamt;
+                Ok(vm.pc + 4)
+            }
+            Instruction::SRLI { rd, rs1, shamt } => {
+                vm.reg[*rd] = vm.reg[*rs1] >> *shamt;
+                Ok(vm.pc + 4)
+            }
+            Instruction::SRAI { rd, rs1, shamt } => {
+                vm.reg[*rd] = ((vm.reg[*rs1] as i32) << *shamt) as u32;
+                Ok(vm.pc + 4)
+            }
+
+            // loads
+            Instruction::LB { rd, rs1, imm } => {
+                let addr = (vm.reg[*rs1] + sext!(*imm, 12)) as usize;
+                vm.reg[*rd] = sext!(vm.mem[addr] as u32, 8);
+                Ok(vm.pc + 4)
+            }
+            Instruction::LH { rd, rs1, imm } => {
+                let addr = (vm.reg[*rs1] + sext!(*imm, 12)) as usize;
+                vm.reg[*rd] = vm.mem[addr] as u32;
+                vm.reg[*rd] |= sext!((vm.mem[addr + 1] as u32) << 8, 16);
+                Ok(vm.pc + 4)
+            }
+            Instruction::LW { rd, rs1, imm } => {
+                let addr = (vm.reg[*rs1] + sext!(*imm, 12)) as usize;
+                vm.reg[*rd] = u32::from_le_bytes(vm.mem[addr..addr + 4].try_into().unwrap());
+                Ok(vm.pc + 4)
+            }
+            Instruction::LBU { rd, rs1, imm } => {
+                let addr = (vm.reg[*rs1] + sext!(*imm, 12)) as usize;
+                vm.reg[*rd] = vm.mem[addr] as u32;
+                Ok(vm.pc + 4)
+            }
+            Instruction::LHU { rd, rs1, imm } => {
+                let addr = (vm.reg[*rs1] + sext!(*imm, 12)) as usize;
+                vm.reg[*rd] = vm.mem[addr] as u32;
+                vm.reg[*rd] |= (vm.mem[addr + 1] as u32) << 8;
+                Ok(vm.pc + 4)
+            }
+
+            // jump
+            Instruction::JALR { rd, rs1, imm } => {
+                vm.reg[*rd] = vm.pc as u32 + 4;
+                Ok((vm.reg[*rs1] + sext!(*imm, 12)) as usize)
+            }
+
+            /* J-Type */
+            Instruction::JAL { rd, imm } => {
+                vm.reg[*rd] = (vm.pc + 4) as u32;
+                Ok((vm.pc as u32).wrapping_add(sext!(*imm, 20)) as usize)
+            }
+
+            /* R-Type */
+            Instruction::ADD { rd, rs1, rs2 } => {
+                vm.reg[*rd] = vm.reg[*rs1] + vm.reg[*rs2];
+                Ok(vm.pc + 4)
+            }
+            Instruction::AND { rd, rs1, rs2 } => {
+                vm.reg[*rd] = vm.reg[*rs1] & vm.reg[*rs2];
+                Ok(vm.pc + 4)
+            }
+            Instruction::OR { rd, rs1, rs2 } => {
+                vm.reg[*rd] = vm.reg[*rs1] | vm.reg[*rs2];
+                Ok(vm.pc + 4)
+            }
+            Instruction::SLL { rd, rs1, rs2 } => {
+                vm.reg[*rd] = vm.reg[*rs1] << vm.reg[*rs2];
+                Ok(vm.pc + 4)
+            }
+            Instruction::SLT { rd, rs1, rs2 } => {
+                vm.reg[*rd] = if (vm.reg[*rs1] as i32) < (vm.reg[*rs2] as i32) {
+                    1
+                } else {
+                    0
+                };
+                Ok(vm.pc + 4)
+            }
+            Instruction::SLTU { rd, rs1, rs2 } => {
+                vm.reg[*rd] = if vm.reg[*rs1] < vm.reg[*rs2] { 1 } else { 0 };
+                Ok(vm.pc + 4)
+            }
+            Instruction::SRL { rd, rs1, rs2 } => {
+                vm.reg[*rd] = vm.reg[*rs1] >> vm.reg[*rs2];
+                Ok(vm.pc + 4)
+            }
+            Instruction::SRA { rd, rs1, rs2 } => {
+                vm.reg[*rd] = ((vm.reg[*rs1] as i32) >> vm.reg[*rs2]) as u32;
+                Ok(vm.pc + 4)
+            }
+            Instruction::SUB { rd, rs1, rs2 } => {
+                vm.reg[*rd] = vm.reg[*rs1] - vm.reg[*rs2];
+                Ok(vm.pc + 4)
+            }
+            Instruction::XOR { rd, rs1, rs2 } => {
+                vm.reg[*rd] = vm.reg[*rs1] ^ vm.reg[*rs2];
+                Ok(vm.pc + 4)
+            }
+
+            /* S-Type */
+            Instruction::SB { rs1, rs2, imm } => {
+                let addr = vm.reg[*rs1].wrapping_add(sext!(*imm, 12)) as usize;
+                vm.mem[addr] = (vm.reg[*rs2] & 0xff) as u8;
+                Ok(vm.pc + 4)
+            }
+            Instruction::SH { rs1, rs2, imm } => {
+                let addr = vm.reg[*rs1].wrapping_add(sext!(*imm, 12)) as usize;
+                vm.mem[addr] = (vm.reg[*rs2] & 0xff) as u8;
+                vm.mem[addr + 1] = ((vm.reg[*rs2] & 0xff00) << 8) as u8;
+                Ok(vm.pc + 4)
+            }
+            Instruction::SW { rs1, rs2, imm } => {
+                let addr = vm.reg[*rs1].wrapping_add(sext!(*imm, 12)) as usize;
+                vm.mem[addr] = (vm.reg[*rs2] & 0xff) as u8;
+                vm.mem[addr + 1] = ((vm.reg[*rs2] & 0xff00) << 8) as u8;
+                vm.mem[addr + 2] = ((vm.reg[*rs2] & 0xffff00) << 8) as u8;
+                vm.mem[addr + 3] = ((vm.reg[*rs2] & 0xffffff00) << 8) as u8;
+                Ok(vm.pc + 4)
+            }
+
+            /* U-Type */
+            Instruction::AUIPC { rd, imm } => {
+                vm.reg[*rd] = vm.pc as u32 + (imm << 12);
+                Ok(vm.pc + 4)
+            }
+            Instruction::LUI { rd, imm } => {
+                vm.reg[*rd] = imm << 12;
+                Ok(vm.pc + 4)
+            }
+
+            /* syscalls */
+            Instruction::ECALL => {
+                let syscall = vm.reg[R_A7];
+                match syscall {
+                    1 => {
+                        log::trace!("MIPS print_int"); // https://student.cs.uwaterloo.ca/~isg/res/mips/traps
+                        println!("{}", (vm.reg[R_A0] as i32));
+                        std::io::stdout().flush().unwrap();
+                    }
+                    4 => {
+                        log::trace!("MIPS print_string");
+                        let pos = vm.reg[R_A0] as usize;
+                        let mut len = 0usize;
+                        while vm.mem[pos + len] != 0 {
+                            len += 1;
+                        }
+
+                        print!(
+                            "{}",
+                            String::from_utf8(vm.mem[pos..pos + len].into()).unwrap()
+                        );
+                        std::io::stdout().flush().unwrap();
+                    }
+                    5 => {
+                        log::trace!("MIPS read_int");
+                        let mut buf: String = String::new();
+                        // TODO catch error
+                        let _ = std::io::stdin().read_line(&mut buf);
+                        vm.reg[R_A0] = buf.trim().parse::<u32>().unwrap(); // TODO get rid of unwrap
+                    }
+                    10 => {
+                        log::trace!("MIPS exit");
+                        process::exit(0);
+                    }
+                    64 => {
+                        // RISC-V write
+                        log::trace!(
+                            "RISC-V linux write syscall: fp: {} addr: {:x} len: {}",
+                            vm.reg[R_A0],
+                            vm.reg[R_A1],
+                            vm.reg[R_A2]
+                        );
+
+                        let mut fp = unsafe { File::from_raw_fd(vm.reg[R_A0] as i32) };
+                        let addr = vm.reg[R_A1] as usize;
+                        let len = vm.reg[R_A2] as usize;
+                        if let Ok(len) = fp.write(&vm.mem[addr..addr + len]) {
+                            log::trace!("wrote {} bytes", len);
+                            vm.reg[R_A0] = len as u32;
+                        } else {
+                            log::trace!("write error");
+                            vm.reg[R_A0] = 0xffffff; // -1
+                        }
+                    }
+                    93 => {
+                        // RISC-V exit
+                        log::trace!("RISC-V linux exit syscall: rc: {}", vm.reg[R_A0]);
+                        process::exit(vm.reg[R_A0] as i32);
+                    }
+                    _ => {
+                        return Err(format!("unknown/unimplemented syscall: {}", syscall));
+                    }
+                }
+                Ok(vm.pc + 4)
+            }
+        }
+    }
+}
+
 impl TryFrom<u32> for Instruction {
     type Error = String;
 
     fn try_from(inst: u32) -> Result<Self, Self::Error> {
+        let opcode = opcode!(inst);
         include!(concat!(env!("OUT_DIR"), "/decode.rs"))
-    }
-}
-
-impl Instruction {
-    fn execute(&self, vm: &mut VirtualMachine) -> Result<usize, String> {
-        match self {
-            /* B-Type (branches) */
-            Instruction::BEQ { rs1, rs2, imm } => {
-                if vm.reg[*rs1] as i32 == vm.reg[*rs2] as i32 {
-                    return Ok(vm.pc + sext!(*imm, 12) as usize);
-                }
-            }
-            Instruction::BNE { rs1, rs2, imm } => {
-                if vm.reg[*rs1] as i32 != vm.reg[*rs2] as i32 {
-                    return Ok(vm.pc + sext!(*imm, 12) as usize);
-                }
-            }
-            Instruction::BLT { rs1, rs2, imm } => {
-                if (vm.reg[*rs1] as i32) < (vm.reg[*rs2] as i32) {
-                    return Ok(vm.pc + sext!(*imm, 12) as usize);
-                }
-            }
-            Instruction::BGE { rs1, rs2, imm } => {
-                if vm.reg[*rs1] as i32 >= vm.reg[*rs2] as i32 {
-                    return Ok(vm.pc + sext!(*imm, 12) as usize);
-                }
-            }
-            Instruction::BLTU { rs1, rs2, imm } => {
-                if vm.reg[*rs1] < vm.reg[*rs2] {
-                    return Ok(vm.pc + sext!(*imm, 12) as usize);
-                }
-            }
-            Instruction::BGEU { rs1, rs2, imm } => {
-                if vm.reg[*rs1] >= vm.reg[*rs2] {
-                    return Ok(vm.pc + sext!(*imm, 12) as usize);
-                }
-            }
-            _ => {
-                return Err("unimplemented instruction".to_string());
-            }
-        }
-        Ok(vm.pc + 4)
     }
 }
 
@@ -115,13 +350,23 @@ impl VirtualMachine {
         VirtualMachine {
             pc: 0x0,
             reg: [0u32; 32],
-            mem: vec![0u8; if let Some(n) = alloc { n } else { DEFAULT_MEMORY_SIZE }],
+            mem: vec![
+                0u8;
+                if let Some(n) = alloc {
+                    n
+                } else {
+                    DEFAULT_MEMORY_SIZE
+                }
+            ],
             sections: HashMap::new(),
             symtab: HashMap::new(),
         }
     }
 
-    pub fn load_from(path: &str, alloc: Option<usize>) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
+    pub fn load_from(
+        path: &str,
+        alloc: Option<usize>,
+    ) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
         let mut vm = VirtualMachine::new(alloc);
         vm.load(path)?;
         Ok(vm)
@@ -137,7 +382,12 @@ impl VirtualMachine {
         for section in &elf.section_headers {
             if section.is_alloc() {
                 let name = elf.shdr_strtab.get_at(section.sh_name).unwrap().to_string();
-                log::debug!("found section: {}; address: 0x{:x}, length: {} bytes", name, section.sh_addr, section.sh_size);
+                log::debug!(
+                    "found section: {}; address: 0x{:x}, length: {} bytes",
+                    name,
+                    section.sh_addr,
+                    section.sh_size
+                );
                 self.mem[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
                 self.sections.insert(name, section.vm_range());
             }
@@ -160,10 +410,17 @@ impl VirtualMachine {
             log::debug!("program entrypoint: 0x{:x}", pc);
             self.pc = *pc;
         } else if let Some(range) = self.sections.get(".text") {
-            log::warn!("program entrypoint {} not found; falling back to beginning of .text section: {:x}", ENTRYPOINT_SYMNAME, range.start);
+            log::warn!(
+                "program entrypoint {} not found; falling back to beginning of .text section: {:x}",
+                ENTRYPOINT_SYMNAME,
+                range.start
+            );
             self.pc = range.start;
         } else {
-            return Err(Box::new(io::Error::new(io::ErrorKind::InvalidData, "program entrypoint could not be determined")));
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "program entrypoint could not be determined",
+            )));
         }
 
         Ok(())
@@ -204,8 +461,10 @@ impl std::fmt::Debug for VirtualMachine {
                 write!(f, "\n.text:")?;
                 let mut i = range.start;
                 while i < range.end {
-                    let inst = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
-                    write!(f, "\n  {:x}: {:08x} {}", i, inst, disassemble(i, inst))?;
+                    let word = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
+                    let inst = Instruction::try_from(word).unwrap();
+                    write!(f, "\n  {:x}: {:08x} {:?}", i, word, inst)?;
+
                     i += 4;
                 }
             }
@@ -225,12 +484,12 @@ impl std::fmt::Debug for VirtualMachine {
 }
 
 fn disassemble(pc: usize, inst: u32) -> String {
-    // let opcode = opcode!(inst);
+    let opcode = opcode!(inst);
     include!(concat!(env!("OUT_DIR"), "/disasm.rs"))
 }
 
 impl VirtualMachine {
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<(), String> {
         while self.mem[self.pc] != 0 {
             // we'll just reset to zero each iteration rather than blocking writes
             self.reg[0] = 0;
@@ -240,204 +499,23 @@ impl VirtualMachine {
                 log::trace!("{self:?}");
             }
 
-            let inst = self.curr();
-
-            if log::log_enabled!(log::Level::Debug) {
-                log::debug!("{:x}: {:08x} {}", self.pc, inst, disassemble(self.pc, inst))
-            }
-
+            let word = self.curr();
+            let inst = Instruction::try_from(word).unwrap();
             // let opcode = opcode!(inst);
 
-            include!(concat!(env!("OUT_DIR"), "/exec.rs"));
+            if log::log_enabled!(log::Level::Debug) {
+                log::debug!(
+                    "{:x}: {:08x} {:?} ({})",
+                    self.pc,
+                    word,
+                    inst,
+                    disassemble(self.pc, word)
+                );
+            }
 
-            self.pc += 4;
+            self.pc = inst.execute(self)?;
         }
-    }
-
-    /* I-Type */
-
-    // integer operations
-    fn addi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = ((self.reg[rs1] as i32) + (sext!(imm12, 12) as i32)) as u32;
-    }
-    fn andi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = self.reg[rs1] & sext!(imm12, 12);
-    }
-    fn ori(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = self.reg[rs1] | sext!(imm12, 12);
-    }
-    fn slti(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = if self.reg[rs1] < sext!(imm12, 12) { 1 } else { 0 };
-    }
-    fn sltiu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = if (self.reg[rs1] as u32) < (sext!(imm12, 12) as u32) { 1 } else { 0 };
-    }
-    fn xori(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = self.reg[rs1] ^ sext!(imm12, 12);
-    }
-
-    // loads
-    fn lb(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = sext!(self.mem[addr] as u32, 8);
-    }
-    fn lh(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = self.mem[addr] as u32;
-        self.reg[rd] |= sext!((self.mem[addr + 1] as u32) << 8, 16);
-    }
-    fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
-    }
-    fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = self.mem[addr] as u32;
-    }
-    fn lhu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = self.mem[addr] as u32;
-        self.reg[rd] |= (self.mem[addr + 1] as u32) << 8;
-    }
-
-    // jump
-    fn jalr(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = self.reg[rs1] + sext!(imm12, 12);
-        self.reg[rd] = self.pc as u32 + 4;
-        self.pc = (addr - 4) as usize; // NB subtract 4 since we're auto-incrementing
-    }
-
-    /* J-Type */
-    fn jal(&mut self, rd: usize, imm20: u32) {
-        self.reg[rd] = (self.pc + 4) as u32;
-        let addr = (self.pc as u32).wrapping_add(sext!(imm20, 20)) - 4; // NB subtract 4 since we're auto-incrementing
-        self.pc = addr as usize;
-    }
-
-    /* R-Type */
-    fn add(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] + self.reg[rs2];
-    }
-    fn and(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] & self.reg[rs2];
-    }
-    fn or(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] | self.reg[rs2];
-    }
-    fn sll(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] << self.reg[rs2];
-    }
-    fn slt(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = if (self.reg[rs1] as i32) < (self.reg[rs2] as i32) { 1 } else { 0 };
-    }
-    fn sltu(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = if self.reg[rs1] < self.reg[rs2] { 1 } else { 0 };
-    }
-    fn sra(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = ((self.reg[rs1] as i32) >> (self.reg[rs2] as i32)) as u32;
-    }
-    fn srl(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] >> self.reg[rs2];
-    }
-    fn sub(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] - self.reg[rs2];
-    }
-    fn xor(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] ^ self.reg[rs2];
-    }
-
-    fn slli(&mut self, rd: usize, rs1: usize, shamt: usize) {
-        self.reg[rd] = self.reg[rs1] << shamt;
-    }
-    fn srli(&mut self, rd: usize, rs1: usize, shamt: usize) {
-        self.reg[rd] = self.reg[rs1] >> shamt;
-    }
-    fn srai(&mut self, rd: usize, rs1: usize, shamt: usize) {
-        self.reg[rd] = ((self.reg[rs1] as i32) >> shamt) as u32;
-    }
-
-    /* S-Type */
-    fn sb(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
-    }
-    fn sh(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
-        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
-    }
-    fn sw(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
-        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
-        self.mem[addr + 2] = ((self.reg[rs2] & 0xffff00) << 8) as u8;
-        self.mem[addr + 3] = ((self.reg[rs2] & 0xffffff00) << 8) as u8;
-    }
-
-    /* U-Type */
-    fn auipc(&mut self, rd: usize, imm20: u32) {
-        self.reg[rd] = self.pc as u32 + (imm20 << 12);
-    }
-
-    fn lui(&mut self, rd: usize, imm20: u32) {
-        self.reg[rd] = imm20 << 12;
-    }
-
-    /* system calls */
-    fn ecall(&mut self) {
-        let syscall = self.reg[R_A7];
-        match syscall {
-            1 => {
-                log::trace!("MIPS print_int"); // https://student.cs.uwaterloo.ca/~isg/res/mips/traps
-                println!("{}", (self.reg[R_A0] as i32));
-                std::io::stdout().flush().unwrap();
-            }
-            4 => {
-                log::trace!("MIPS print_string");
-                let pos = self.reg[R_A0] as usize;
-                let mut len = 0usize;
-                while self.mem[pos + len] != 0 {
-                    len += 1;
-                }
-
-                print!("{}", String::from_utf8(self.mem[pos..pos + len].into()).unwrap());
-                std::io::stdout().flush().unwrap();
-            }
-            5 => {
-                log::trace!("MIPS read_int");
-                let mut buf: String = String::new();
-                // TODO catch error
-                let _ = std::io::stdin().read_line(&mut buf);
-                self.reg[R_A0] = buf.trim().parse::<u32>().unwrap(); // TODO get rid of unwrap
-            }
-            10 => {
-                log::trace!("MIPS exit");
-                process::exit(0);
-            }
-            64 => {
-                // RISC-V write
-                log::trace!("RISC-V linux write syscall: fp: {} addr: {:x} len: {}", self.reg[R_A0], self.reg[R_A1], self.reg[R_A2]);
-
-                let mut fp = unsafe { File::from_raw_fd(self.reg[R_A0] as i32) };
-                let addr = self.reg[R_A1] as usize;
-                let len = self.reg[R_A2] as usize;
-                if let Ok(len) = fp.write(&self.mem[addr..addr + len]) {
-                    log::trace!("wrote {} bytes", len);
-                    self.reg[R_A0] = len as u32;
-                } else {
-                    log::trace!("write error");
-                    self.reg[R_A0] = 0xffffff; // -1
-                }
-            }
-            93 => {
-                // RISC-V exit
-                log::trace!("RISC-V linux exit syscall: rc: {}", self.reg[R_A0]);
-                process::exit(self.reg[R_A0] as i32);
-            }
-            _ => {
-                log::error!("unknown/unimplemented syscall: {}", syscall);
-            }
-        }
+        Ok(())
     }
 }
 
@@ -466,6 +544,14 @@ macro_rules! rs1 {
 macro_rules! rs2 {
     ($inst:expr) => {
         ((($inst >> 20) & 0b1_1111) as usize)
+    };
+}
+
+// same as rs2!, but as u32
+#[macro_export]
+macro_rules! shamt {
+    ($inst:expr) => {
+        (($inst >> 20) & 0b1_1111)
     };
 }
 

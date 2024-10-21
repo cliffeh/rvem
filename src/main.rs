@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         log::trace!("{:#?}", vm);
     }
 
-    vm.run();
+    vm.run()?;
 
     Ok(())
 }
