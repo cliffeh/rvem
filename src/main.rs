@@ -1,11 +1,15 @@
 use ::rvem::VirtualMachine;
 use clap::Parser;
 use rvem::DEFAULT_MEMORY_SIZE;
-use std::env;
+use std::{env, process};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Dump the program and exit
+    #[arg(short = 'D', long, default_value_t = false)]
+    dump: bool,
+
     /// Set log level (overrides RUST_LOG environment variable)
     #[arg(short, long)]
     log_level: Option<String>,
@@ -33,7 +37,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut vm: VirtualMachine = VirtualMachine::load_from(&args.file, Some(args.memory))?;
 
-    if log::log_enabled!(log::Level::Trace) {
+    if args.dump {
+        println!("{vm:#?}");
+        process::exit(0);
+    } else if log::log_enabled!(log::Level::Trace) {
         log::trace!("{:#?}", vm);
     }
 

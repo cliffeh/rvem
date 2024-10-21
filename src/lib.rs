@@ -182,10 +182,16 @@ impl VirtualMachine {
             self.reg[0] = 0;
 
             if log::log_enabled!(log::Level::Trace) {
-                println!("{self:?}");
+                // dump registers
+                log::trace!("{self:?}");
             }
 
             let inst = self.curr();
+
+            if log::log_enabled!(log::Level::Debug) {
+                log::debug!("{:x}: {:08x} {}", self.pc, inst, disassemble(self.pc, inst))
+            }
+
             let opcode = opcode!(inst);
 
             include!(concat!(env!("OUT_DIR"), "/exec.rs"));
@@ -196,37 +202,31 @@ impl VirtualMachine {
 
     /* B-Type (branches) */
     fn beq(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        log::debug!("{:x} {:08x}: beq {}, {}, {:x}", self.pc, self.curr(), REG_NAMES[rs1], REG_NAMES[rs2], sext!(imm13, 12) + self.pc as u32);
         if self.reg[rs1] == self.reg[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bne(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        log::debug!("{:x} {:08x}: bne {}, {}, {:x}", self.pc, self.curr(), REG_NAMES[rs1], REG_NAMES[rs2], sext!(imm13, 12) + self.pc as u32);
         if self.reg[rs1] != self.reg[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn blt(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        log::debug!("{:x} {:08x}: blt {}, {}, {:x}", self.pc, self.curr(), REG_NAMES[rs1], REG_NAMES[rs2], sext!(imm13, 12) + self.pc as u32);
         if self.reg[rs1] < self.reg[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bge(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        log::debug!("{:x} {:08x}: bge {}, {}, {:x}", self.pc, self.curr(), REG_NAMES[rs1], REG_NAMES[rs2], sext!(imm13, 12) + self.pc as u32);
         if self.reg[rs1] >= self.reg[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bltu(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        log::debug!("{:x} {:08x}: bltu {}, {}, {:x}", self.pc, self.curr(), REG_NAMES[rs1], REG_NAMES[rs2], sext!(imm13, 12) + self.pc as u32);
         if (self.reg[rs1] as u32) < (self.reg[rs2] as u32) {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bgeu(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        log::debug!("{:x} {:08x}: bltu {}, {}, {:x}", self.pc, self.curr(), REG_NAMES[rs1], REG_NAMES[rs2], sext!(imm13, 12) + self.pc as u32);
         if (self.reg[rs1] as u32) >= (self.reg[rs2] as u32) {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
@@ -236,54 +236,43 @@ impl VirtualMachine {
 
     // integer operations
     fn addi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: addi {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12) as i32);
         self.reg[rd] = ((self.reg[rs1] as i32) + (sext!(imm12, 12) as i32)) as u32;
     }
     fn andi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: andi {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
         self.reg[rd] = self.reg[rs1] & sext!(imm12, 12);
     }
     fn ori(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: xori {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
         self.reg[rd] = self.reg[rs1] | sext!(imm12, 12);
     }
     fn slti(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: slti {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
         self.reg[rd] = if self.reg[rs1] < sext!(imm12, 12) { 1 } else { 0 };
     }
     fn sltiu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: sltiu {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
         self.reg[rd] = if (self.reg[rs1] as u32) < (sext!(imm12, 12) as u32) { 1 } else { 0 };
     }
     fn xori(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: xori {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], sext!(imm12, 12));
         self.reg[rd] = self.reg[rs1] ^ sext!(imm12, 12);
     }
 
     // loads
     fn lb(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        log::debug!("{:x} {:08x}: lb {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
         self.reg[rd] = sext!(self.mem[addr] as u32, 8);
     }
     fn lh(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        log::debug!("{:x} {:08x}: lh {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
         self.reg[rd] = self.mem[addr] as u32;
         self.reg[rd] |= sext!((self.mem[addr + 1] as u32) << 8, 16);
     }
     fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        log::debug!("{:x} {:08x}: lw {}, {}({}) # {:x}", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1], addr);
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: lbu {}, {}({})", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1]);
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
         self.reg[rd] = self.mem[addr] as u32;
     }
     fn lhu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: lhu {}, {}({})", self.pc, self.curr(), REG_NAMES[rd], sext!(imm12, 12), REG_NAMES[rs1]);
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
         self.reg[rd] = self.mem[addr] as u32;
         self.reg[rd] |= (self.mem[addr + 1] as u32) << 8;
@@ -292,14 +281,12 @@ impl VirtualMachine {
     // jump
     fn jalr(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = self.reg[rs1] + sext!(imm12, 12);
-        log::debug!("{:x} {:08x}: jalr 0x{:x}", self.pc, self.curr(), addr);
         self.reg[rd] = self.pc as u32 + 4;
         self.pc = (addr - 4) as usize; // NB subtract 4 since we're auto-incrementing
     }
 
     /* J-Type */
     fn jal(&mut self, rd: usize, imm20: u32) {
-        log::debug!("{:x} {:08x}: jal 0x{:x}", self.pc, self.curr(), (self.pc as u32).wrapping_add(sext!(imm20, 20)));
         self.reg[rd] = (self.pc + 4) as u32;
         let addr = (self.pc as u32).wrapping_add(sext!(imm20, 20)) - 4; // NB subtract 4 since we're auto-incrementing
         self.pc = addr as usize;
@@ -307,77 +294,57 @@ impl VirtualMachine {
 
     /* R-Type */
     fn add(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: add {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = self.reg[rs1] + self.reg[rs2];
     }
     fn and(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: and {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = self.reg[rs1] & self.reg[rs2];
     }
     fn or(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: or {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = self.reg[rs1] | self.reg[rs2];
     }
     fn sll(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: sll {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = self.reg[rs1] << self.reg[rs2];
     }
     fn slt(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: slt {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = if (self.reg[rs1] as i32) < (self.reg[rs2] as i32) { 1 } else { 0 };
     }
     fn sltu(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: sltu {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = if self.reg[rs1] < self.reg[rs2] { 1 } else { 0 };
     }
     fn sra(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: sra {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = ((self.reg[rs1] as i32) >> (self.reg[rs2] as i32)) as u32;
     }
     fn srl(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: srl {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = self.reg[rs1] >> self.reg[rs2];
     }
     fn sub(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: sub {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = self.reg[rs1] - self.reg[rs2];
     }
     fn xor(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        log::debug!("{:x} {:08x}: xor {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], REG_NAMES[rs2]);
         self.reg[rd] = self.reg[rs1] ^ self.reg[rs2];
     }
 
     fn slli(&mut self, rd: usize, rs1: usize, shamt: usize) {
-        log::debug!("{:x} {:08x}: slli {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], shamt);
         self.reg[rd] = self.reg[rs1] << shamt;
     }
     fn srli(&mut self, rd: usize, rs1: usize, shamt: usize) {
-        log::debug!("{:x} {:08x}: srli {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], shamt);
         self.reg[rd] = self.reg[rs1] >> shamt;
     }
     fn srai(&mut self, rd: usize, rs1: usize, shamt: usize) {
-        log::debug!("{:x} {:08x}: srai {}, {}, {}", self.pc, self.curr(), REG_NAMES[rd], REG_NAMES[rs1], shamt);
         self.reg[rd] = ((self.reg[rs1] as i32) >> shamt) as u32;
     }
 
     /* S-Type */
     fn sb(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: sb {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
-        // M[x[rs1] + sext(imm[11:0])][7:0] = x[rs2][7:0]
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
     }
     fn sh(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        // M[x[rs1] + sext(imm[11:0])][15:0] = x[rs2][15:0]
-        log::debug!("{:x} {:08x}: sh {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
         self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
     }
     fn sw(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        log::debug!("{:x} {:08x}: sw {}, {}({})", self.pc, self.curr(), REG_NAMES[rs2], sext!(imm12, 12), REG_NAMES[rs1]);
-        // sw rs2, imm(rs1) - e.g., sw ra, 8(sp)
-        // M[x[rs1] + sext(imm[11:0])][31:0] = x[rs2][31:0]
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
         self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
@@ -387,7 +354,6 @@ impl VirtualMachine {
 
     /* U-Type */
     fn auipc(&mut self, rd: usize, imm20: u32) {
-        log::debug!("{:x} {:08x}: auipc {}, 0x{:x}", self.pc, self.curr(), REG_NAMES[rd], imm20);
         self.reg[rd] = self.pc as u32 + (imm20 << 12);
     }
 
@@ -397,7 +363,6 @@ impl VirtualMachine {
 
     /* system calls */
     fn ecall(&mut self) {
-        log::debug!("{:x} {:08x}: ecall", self.pc, self.curr());
         let syscall = self.reg[R_A7];
         match syscall {
             1 => {
