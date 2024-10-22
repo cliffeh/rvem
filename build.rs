@@ -34,45 +34,44 @@ fn main() {
     for line in read_to_string("src/rv32i.tab").unwrap().lines() {
         let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
 
-        let op = sanitize_name(pieces[pieces.len() - 1]);
-        let opcode = pieces[pieces.len() - 2];
-        let name = format_ident!("{}", op);
+        let opname = sanitize_name(pieces[pieces.len() - 1]);
+        let opcode = format!("0b{}", pieces[pieces.len() - 2]);
+        let opident = format_ident!("{}", opname);
 
         // TODO this will work for now, but could use refinement/refactoring
         match pieces[0] {
             // imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
             "imm[12|10:5]" => {
                 // B-Type
-                let funct3 = btype.entry(opcode.into()).or_default();
-                funct3.insert(pieces[3].into(), pieces[6].into());
-                // let name = format_ident!("{}", pieces[6]);
-                variants.push(quote! {#name{rs1: usize, rs2: usize, imm: u32}});
-                // variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
+                variants.push(quote! {#opident{rs1: usize, rs2: usize, imm: u32}});
+
+                let funct3 = format!("0b{}", pieces[3]);
+                let funct3s = btype.entry(opcode).or_default();
+                funct3s.insert(funct3, opname);
             }
             // imm[11:0] rs1 000 rd 0010011 ADDI
             "imm[11:0]" => {
                 // I-Type
-                let funct3 = itype.entry(opcode.into()).or_default();
-                funct3.insert(pieces[2].into(), pieces[5].into());
-                // let name = format_ident!("{}", pieces[5]);
-                variants.push(quote! {#name{rd: usize, rs1: usize, imm: u32}});
-                // variants += &format!("{}{{rd: usize, rs1: usize, imm: u32}},\n", pieces[5]);
+                variants.push(quote! {#opident{rd: usize, rs1: usize, imm: u32}});
+
+                let funct3 = format!("0b{}", pieces[2]);
+                let funct3s = itype.entry(opcode).or_default();
+                funct3s.insert(funct3, opname);
             }
             // imm[20|10:1|11|19:12] rd 1101111 JAL
             "imm[20|10:1|11|19:12]" => {
                 // J-Type
+                variants.push(quote! {#opident{rd: usize,  imm: u32}});
+
                 decode_cases += &format!(
-                    "0b{} => Ok(Instruction::{}{{rd: rd!(inst), imm: imm_j!(inst)}}),\n",
-                    pieces[2], pieces[3]
+                    "{} => Ok(Instruction::{}{{rd: rd!(inst), imm: imm_j!(inst)}}),\n",
+                    opcode, opname
                 );
                 disasm_cases += &format!(
-                    "0b{} => format!(\"{} {{:x}}\", (pc as u32).wrapping_add(sext!(imm_j!(inst), 20))),\n",
+                    "{} => format!(\"{} {{:x}}\", (pc as u32).wrapping_add(sext!(imm_j!(inst), 20))),\n",
                     pieces[2],
                     pieces[3].to_lowercase()
                 );
-                // let name = format_ident!("{}", pieces[3]);
-                variants.push(quote! {#name{rd: usize,  imm: u32}});
-                // variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
             }
             // 0000000 rs2 rs1 000 rd 0110011 ADD
             "0000000" | "0100000" => {
@@ -80,57 +79,55 @@ fn main() {
                 // let name = format_ident!("{}", pieces[6]);
                 if pieces[1] == "shamt" {
                     // 0000000 shamt rs1 001 rd 0010011 SLLI
-                    variants.push(quote! {#name{rd: usize, rs1: usize, shamt: u32}});
-                    let funct3 = shamt.entry(pieces[5].into()).or_default();
+                    variants.push(quote! {#opident{rd: usize, rs1: usize, shamt: u32}});
+
+                    let funct3 = shamt.entry(opcode).or_default();
                     let funct7 = funct3.entry(pieces[3].into()).or_default();
-                    funct7.insert(pieces[0].into(), pieces[6].into());
-                    // variants += &format!("{}{{rd: usize, rs1: usize, shamt: u32}},\n", pieces[6]);
+                    funct7.insert(pieces[0].into(), opname);
                 } else {
-                    variants.push(quote! {#name{rd: usize, rs1: usize, rs2: usize}});
-                    let funct3 = rtype.entry(pieces[5].into()).or_default();
+                    variants.push(quote! {#opident{rd: usize, rs1: usize, rs2: usize}});
+
+                    let funct3 = rtype.entry(opcode).or_default();
                     let funct7 = funct3.entry(pieces[3].into()).or_default();
-                    funct7.insert(pieces[0].into(), pieces[6].into());
-                    // variants += &format!("{}{{rd: usize, rs1: usize, rs2: usize}},\n", pieces[6]);
+                    funct7.insert(pieces[0].into(), opname);
                 }
             }
             // imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
             "imm[11:5]" => {
                 // S-Type
-                let funct3 = stype.entry(pieces[5].into()).or_default();
+                variants.push(quote! {#opident{rs1: usize, rs2: usize, imm: u32}});
+
+                let funct3 = stype.entry(opcode).or_default();
                 funct3.insert(pieces[3].into(), pieces[6].into());
-                // variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
-                // let name = format_ident!("{}", pieces[6]);
-                variants.push(quote! {#name{rs1: usize, rs2: usize, imm: u32}});
             }
             // imm[31:12] rd 0110111 LUI
             "imm[31:12]" => {
                 // U-Type
+                variants.push(quote! {#opident{rd: usize, imm: u32}});
+
                 decode_cases += &format!(
-                    "0b{} => Ok(Instruction::{}{{rd: rd!(inst), imm: inst >> 12}}),\n",
-                    pieces[2], pieces[3]
+                    "{} => Ok(Instruction::{}{{rd: rd!(inst), imm: inst >> 12}}),\n",
+                    opcode, opname
                 );
                 disasm_cases += &format!(
-                    "0b{} => format!(\"{} {{}}, 0x{{:x}}\", REG_NAMES[rd!(inst)], inst >> 12),\n",
-                    pieces[2],
-                    pieces[3].to_lowercase()
+                    "{} => format!(\"{} {{}}, 0x{{:x}}\", REG_NAMES[rd!(inst)], inst >> 12),\n",
+                    opcode,
+                    opname.to_lowercase()
                 );
-                let name = format_ident!("{}", pieces[3]);
-                variants.push(quote! {#name{rd: usize, imm: u32}});
-                // variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
             }
             // TODO is there a way to output build warnings about ignored lines?
             _ => {
-                variants.push(quote!{#name});
+                variants.push(quote! {#opident});
             }
         }
     }
 
     // B-Type
     for (opcode, subcodes) in btype {
-        decode_cases += &format!("0b{} => {{\n", opcode);
+        decode_cases += &format!("{} => {{\n", opcode);
         decode_cases += &format!("let funct3 = funct3!(inst);\n");
         decode_cases += "match funct3 {";
-        disasm_cases += &format!("0b{} => {{\n", opcode);
+        disasm_cases += &format!("{} => {{\n", opcode);
         disasm_cases += &format!("let funct3 = funct3!(inst);\n");
         disasm_cases += "match funct3 {";
         for (funct3, op) in subcodes {
@@ -152,10 +149,10 @@ fn main() {
 
     // I-Type
     for (opcode, funct3s) in itype {
-        disasm_cases += &format!("0b{} => {{\n", opcode);
+        disasm_cases += &format!("{} => {{\n", opcode);
         disasm_cases += &format!("let funct3 = funct3!(inst);\n");
         disasm_cases += "match funct3 {";
-        decode_cases += &format!("0b{} => {{\n", opcode);
+        decode_cases += &format!("{} => {{\n", opcode);
         decode_cases += &format!("let funct3 = funct3!(inst);\n");
         decode_cases += "match funct3 {";
         for (funct3, op) in funct3s {
@@ -172,10 +169,10 @@ fn main() {
         // special case for I-Types w/shamt instead of rs2
         if let Some(funct3s) = shamt.get(&opcode) {
             for (funct3, funct7s) in funct3s {
-                disasm_cases += &format!("0b{} => {{", funct3);
+                disasm_cases += &format!("{} => {{", funct3);
                 disasm_cases += &format!("let funct7 = funct7!(inst);\n");
                 disasm_cases += "match funct7 {";
-                decode_cases += &format!("0b{} => {{", funct3);
+                decode_cases += &format!("{} => {{", funct3);
                 decode_cases += &format!("let funct7 = funct7!(inst);\n");
                 decode_cases += "match funct7 {";
                 for (funct7, op) in funct7s {
@@ -203,10 +200,10 @@ fn main() {
 
     // R-Type
     for (opcode, funct3s) in rtype {
-        decode_cases += &format!("0b{} => {{\n", opcode);
+        decode_cases += &format!("{} => {{\n", opcode);
         decode_cases += &format!("let funct3 = funct3!(inst);\n");
         decode_cases += "match funct3 {";
-        disasm_cases += &format!("0b{} => {{\n", opcode);
+        disasm_cases += &format!("{} => {{\n", opcode);
         disasm_cases += &format!("let funct3 = funct3!(inst);\n");
         disasm_cases += "match funct3 {";
         for (funct3, funct7s) in funct3s {
