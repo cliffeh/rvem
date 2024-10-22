@@ -9,6 +9,10 @@ use std::fs::read_to_string;
 use std::path::Path;
 use syn::Ident;
 
+fn sanitize_name(name: &str) -> String {
+    name.replace(".", "_")
+}
+
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let decode_path = Path::new(&out_dir).join("decode.rs");
@@ -30,23 +34,27 @@ fn main() {
     for line in read_to_string("src/rv32i.tab").unwrap().lines() {
         let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
 
+        let op = sanitize_name(pieces[pieces.len() - 1]);
+        let opcode = pieces[pieces.len() - 2];
+        let name = format_ident!("{}", op);
+
         // TODO this will work for now, but could use refinement/refactoring
         match pieces[0] {
             // imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
             "imm[12|10:5]" => {
                 // B-Type
-                let funct3 = btype.entry(pieces[5].into()).or_default();
+                let funct3 = btype.entry(opcode.into()).or_default();
                 funct3.insert(pieces[3].into(), pieces[6].into());
-                let name = format_ident!("{}", pieces[6]);
+                // let name = format_ident!("{}", pieces[6]);
                 variants.push(quote! {#name{rs1: usize, rs2: usize, imm: u32}});
                 // variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
             }
             // imm[11:0] rs1 000 rd 0010011 ADDI
             "imm[11:0]" => {
                 // I-Type
-                let funct3 = itype.entry(pieces[4].into()).or_default();
+                let funct3 = itype.entry(opcode.into()).or_default();
                 funct3.insert(pieces[2].into(), pieces[5].into());
-                let name = format_ident!("{}", pieces[5]);
+                // let name = format_ident!("{}", pieces[5]);
                 variants.push(quote! {#name{rd: usize, rs1: usize, imm: u32}});
                 // variants += &format!("{}{{rd: usize, rs1: usize, imm: u32}},\n", pieces[5]);
             }
@@ -62,14 +70,14 @@ fn main() {
                     pieces[2],
                     pieces[3].to_lowercase()
                 );
-                let name = format_ident!("{}", pieces[3]);
+                // let name = format_ident!("{}", pieces[3]);
                 variants.push(quote! {#name{rd: usize,  imm: u32}});
                 // variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
             }
             // 0000000 rs2 rs1 000 rd 0110011 ADD
             "0000000" | "0100000" => {
                 // R-Type/shamt
-                let name = format_ident!("{}", pieces[6]);
+                // let name = format_ident!("{}", pieces[6]);
                 if pieces[1] == "shamt" {
                     // 0000000 shamt rs1 001 rd 0010011 SLLI
                     variants.push(quote! {#name{rd: usize, rs1: usize, shamt: u32}});
@@ -84,7 +92,6 @@ fn main() {
                     funct7.insert(pieces[0].into(), pieces[6].into());
                     // variants += &format!("{}{{rd: usize, rs1: usize, rs2: usize}},\n", pieces[6]);
                 }
-                
             }
             // imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
             "imm[11:5]" => {
@@ -92,7 +99,7 @@ fn main() {
                 let funct3 = stype.entry(pieces[5].into()).or_default();
                 funct3.insert(pieces[3].into(), pieces[6].into());
                 // variants += &format!("{}{{rs1: usize, rs2: usize, imm: u32}},\n", pieces[6]);
-                let name = format_ident!("{}", pieces[6]);
+                // let name = format_ident!("{}", pieces[6]);
                 variants.push(quote! {#name{rs1: usize, rs2: usize, imm: u32}});
             }
             // imm[31:12] rd 0110111 LUI
@@ -112,7 +119,9 @@ fn main() {
                 // variants += &format!("{}{{rd: usize, imm: u32}},\n", pieces[3]);
             }
             // TODO is there a way to output build warnings about ignored lines?
-            _ => {}
+            _ => {
+                variants.push(quote!{#name});
+            }
         }
     }
 
@@ -285,7 +294,7 @@ fn main() {
     // names.push(vname);
     // let mut variants: Vec<proc_macro2::TokenStream> = vec![];
     // variants.push(quote!{#vname{rd: usize}});
-    variants.push(quote! {ECALL,});
+    // variants.push(quote! {ECALL,});
     let output = quote! {
         pub enum Instruction {
            #(#variants),*
