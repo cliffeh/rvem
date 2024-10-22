@@ -16,6 +16,10 @@ endif
 
 default: help
 
+build: target/debug/rvem  # builds the RISC-V emulator
+	cargo build
+.PHONY: hello
+
 run: $(PROG)  ## emulate a RISC-V program
 	cargo run -- tests/data/$<
 .PHONY: hello
@@ -44,8 +48,12 @@ readelf: $(PROG)  ## display ELF information
 	$(ASPREFIX)-readelf -a tests/data/$<
 .PHONY: readelf
 
-check: $(PROGS)  ## emulate all programs (TODO: check for expected output)
-	for prog in $^; do cargo run -- tests/data/$$prog; done
+check: $(PROGS)  ## emulate all programs and test their output
+	# for prog in $^; do cargo run -- tests/data/$$prog; done
+	cargo run -- tests/data/hello | head -1 | grep 'Hello World!'
+	cargo run -- tests/data/fib | head -1 | grep 267914296
+	cargo run -- tests/data/fac | head -1 | grep 120
+	cargo run -- tests/data/strlen | head -1 | grep 44
 .PHONY: check
 
 ### targets that actually build things
