@@ -58,65 +58,6 @@ include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 // impl TryFrom<u32> for Instruction
 include!(concat!(env!("OUT_DIR"), "/decode.rs"));
 
-// impl std::fmt::Debug for Instruction {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Self::ADDI { rd, rs1, imm } => {
-//                 write!(f, "addi {rd}, {rs1}, {imm}")?;
-//             }
-//             _ => write!(f, "unknown")?
-//             // Self::LUI { rd, imm } => f.debug_struct("LUI").field("rd", rd).field("imm", imm).finish(),
-//             // Self::AUIPC { rd, imm } => f.debug_struct("AUIPC").field("rd", rd).field("imm", imm).finish(),
-//             // Self::JAL { rd, imm } => f.debug_struct("JAL").field("rd", rd).field("imm", imm).finish(),
-//             // Self::JALR { rd, rs1, imm } => f.debug_struct("JALR").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::BEQ { rs1, rs2, imm } => f.debug_struct("BEQ").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::BNE { rs1, rs2, imm } => f.debug_struct("BNE").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::BLT { rs1, rs2, imm } => f.debug_struct("BLT").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::BGE { rs1, rs2, imm } => f.debug_struct("BGE").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::BLTU { rs1, rs2, imm } => f.debug_struct("BLTU").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::BGEU { rs1, rs2, imm } => f.debug_struct("BGEU").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::LB { rd, rs1, imm } => f.debug_struct("LB").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::LH { rd, rs1, imm } => f.debug_struct("LH").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::LW { rd, rs1, imm } => f.debug_struct("LW").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::LBU { rd, rs1, imm } => f.debug_struct("LBU").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::LHU { rd, rs1, imm } => f.debug_struct("LHU").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::SB { rs1, rs2, imm } => f.debug_struct("SB").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::SH { rs1, rs2, imm } => f.debug_struct("SH").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::SW { rs1, rs2, imm } => f.debug_struct("SW").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
-//             // Self::ADDI { rd, rs1, imm } => f.debug_struct("ADDI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::SLTI { rd, rs1, imm } => f.debug_struct("SLTI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::SLTIU { rd, rs1, imm } => f.debug_struct("SLTIU").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::XORI { rd, rs1, imm } => f.debug_struct("XORI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::ORI { rd, rs1, imm } => f.debug_struct("ORI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::ANDI { rd, rs1, imm } => f.debug_struct("ANDI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
-//             // Self::SLLI { rd, rs1, shamt } => f.debug_struct("SLLI").field("rd", rd).field("rs1", rs1).field("shamt", shamt).finish(),
-//             // Self::SRLI { rd, rs1, shamt } => f.debug_struct("SRLI").field("rd", rd).field("rs1", rs1).field("shamt", shamt).finish(),
-//             // Self::SRAI { rd, rs1, shamt } => f.debug_struct("SRAI").field("rd", rd).field("rs1", rs1).field("shamt", shamt).finish(),
-//             // Self::ADD { rd, rs1, rs2 } => f.debug_struct("ADD").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::SUB { rd, rs1, rs2 } => f.debug_struct("SUB").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::SLL { rd, rs1, rs2 } => f.debug_struct("SLL").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::SLT { rd, rs1, rs2 } => f.debug_struct("SLT").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::SLTU { rd, rs1, rs2 } => f.debug_struct("SLTU").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::XOR { rd, rs1, rs2 } => f.debug_struct("XOR").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::SRL { rd, rs1, rs2 } => f.debug_struct("SRL").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::SRA { rd, rs1, rs2 } => f.debug_struct("SRA").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::OR { rd, rs1, rs2 } => f.debug_struct("OR").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::AND { rd, rs1, rs2 } => f.debug_struct("AND").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
-//             // Self::FENCE => write!(f, "FENCE"),
-//             // Self::FENCE_I => write!(f, "FENCE_I"),
-//             // Self::ECALL => write!(f, "ECALL"),
-//             // Self::EBREAK => write!(f, "EBREAK"),
-//             // Self::CSRRW => write!(f, "CSRRW"),
-//             // Self::CSRRS => write!(f, "CSRRS"),
-//             // Self::CSRRC => write!(f, "CSRRC"),
-//             // Self::CSRRWI => write!(f, "CSRRWI"),
-//             // Self::CSRRSI => write!(f, "CSRRSI"),
-//             // Self::CSRRCI => write!(f, "CSRRCI"),
-//         }
-//         Ok(())
-//     }
-// }
-
 pub struct VirtualMachine {
     pub pc: usize,
     pub reg: [u32; 32],
@@ -203,6 +144,9 @@ impl VirtualMachine {
             )));
         }
 
+        // TODO find a better place for the stack pointer than "in the middle"...
+        self.reg[R_SP] = (self.mem.len()/2) as u32;
+
         Ok(())
     }
 
@@ -279,12 +223,7 @@ impl VirtualMachine {
             // let opcode = opcode!(inst);
 
             if log::log_enabled!(log::Level::Debug) {
-                log::debug!(
-                    "{:x}: {:08x} {:?}",
-                    self.pc,
-                    word,
-                    inst
-                );
+                log::debug!("{:x}: {:08x} {:?}", self.pc, word, inst);
             }
 
             inst.execute(self);
@@ -375,6 +314,15 @@ impl VirtualMachine {
     }
     fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
+        log::trace!("LW MEM-4: {:x}: {:02x}", addr-4, self.mem[addr-4]);
+        log::trace!("LW MEM-3: {:x}: {:02x}", addr-3, self.mem[addr-3]);
+        log::trace!("LW MEM-2: {:x}: {:02x}", addr-2, self.mem[addr-2]);
+        log::trace!("LW MEM-1: {:x}: {:02x}", addr-1, self.mem[addr-1]);
+        log::trace!("LW MEM: {:x}: {:02x}", addr, self.mem[addr]);
+        log::trace!("LW MEM+1: {:x}: {:02x}", addr+1, self.mem[addr+1]);
+        log::trace!("LW MEM+2: {:x}: {:02x}", addr+2, self.mem[addr+2]);
+        log::trace!("LW MEM+3: {:x}: {:02x}", addr+3, self.mem[addr+3]);
+        log::trace!("LW MEM+4: {:x}: {:02x}", addr+4, self.mem[addr+4]);
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
@@ -450,19 +398,22 @@ impl VirtualMachine {
     /* S-Type */
     fn sb(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
+        let bytes = self.reg[rs2].to_le_bytes();
+        self.mem[addr] = bytes[0];
     }
     fn sh(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
-        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
+        let bytes = self.reg[rs2].to_le_bytes();
+        self.mem[addr] = bytes[0];
+        self.mem[addr + 1] = bytes[1];
     }
     fn sw(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
-        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
-        self.mem[addr + 2] = ((self.reg[rs2] & 0xffff00) << 8) as u8;
-        self.mem[addr + 3] = ((self.reg[rs2] & 0xffffff00) << 8) as u8;
+        let bytes = self.reg[rs2].to_le_bytes();
+        self.mem[addr] = bytes[0];
+        self.mem[addr + 1] = bytes[1];
+        self.mem[addr + 2] = bytes[2];
+        self.mem[addr + 3] = bytes[3];
     }
 
     /* U-Type */
@@ -537,6 +488,44 @@ impl VirtualMachine {
                 log::error!("unknown/unimplemented syscall: {}", syscall);
             }
         }
+    }
+}
+
+#[cfg(feature = "rv32m")]
+impl VirtualMachine {
+    /* R-Type */
+    // NB all multiplication extensions are R-Type
+    fn mul(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = ((self.reg[rs1] as i32) * (self.reg[rs2] as i32)) as u32;
+    }
+
+    fn mulh(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = (((self.reg[rs1] as i64) * (self.reg[rs2] as i64)) >> 32) as u32;
+    }
+
+    fn mulhu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = (((self.reg[rs1] as u64) * (self.reg[rs2] as u64)) >> 32) as u32;
+    }
+
+    fn mulhsu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        // NB I don't think this is quite correct, but I'm fuzzy on what is...
+        self.reg[rd] = (((self.reg[rs1] as u64) * (self.reg[rs2] as u64)) >> 32) as u32;
+    }
+
+    fn div(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = ((self.reg[rs1] as i32) / (self.reg[rs2] as i32)) as u32;
+    }
+
+    fn divu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = self.reg[rs1] / self.reg[rs2];
+    }
+
+    fn rem(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = ((self.reg[rs1] as i32) % (self.reg[rs2] as i32)) as u32;
+    }
+
+    fn remu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = self.reg[rs1] % self.reg[rs2];
     }
 }
 

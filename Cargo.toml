@@ -18,5 +18,6 @@ quote = "1.0.37"
 syn = "2.0.82"
 
 [features]
-default = ["rv32i"]
+default = ["rv32i", "rv32m"]
 rv32i = []
+rv32m = ["rv32i"]
