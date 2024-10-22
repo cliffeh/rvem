@@ -1,4 +1,4 @@
-PROGS=hello fib1 strlen
+PROGS=hello fac fib strlen
 DEFAULT_PROG=hello
 PROG?=$(DEFAULT_PROG)
 
@@ -53,7 +53,7 @@ $(PROGS): %: tests/data/%.o
 	$(ASPREFIX)-ld -melf32lriscv -o tests/data/$@ $<
 
 %.o: %.s
-	$(ASPREFIX)-as -march=rv32i $< -o $@
+	$(ASPREFIX)-as -march=rv32im $< -o $@
 
 
 format:  ## beautify rust code
@@ -89,7 +89,8 @@ help: ## show this help
 	@echo "Available programs:"
 	@echo
 	@printf "  \033[0;36m%-12s\033[m %s\n" hello "(default) your bog standard \"Hello, World!\" program"
-	@printf "  \033[0;36m%-12s\033[m %s\n" fib1 "computes the Fibonacci sequence up to fib(42)"
+	@printf "  \033[0;36m%-12s\033[m %s\n" fac "computes 5!"
+	@printf "  \033[0;36m%-12s\033[m %s\n" fib "computes the Fibonacci sequence up to fib(42)"
 	@printf "  \033[0;36m%-12s\033[m %s\n" strlen "computes the length of \"The quick brown fox jumps over the lazy dog.\""
 	@echo ""
 	@echo "Examples:"

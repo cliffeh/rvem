@@ -144,6 +144,9 @@ impl VirtualMachine {
             )));
         }
 
+        // TODO find a better place for the stack pointer than "in the middle"...
+        self.reg[R_SP] = (self.mem.len()/2) as u32;
+
         Ok(())
     }
 
@@ -311,6 +314,15 @@ impl VirtualMachine {
     }
     fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
+        log::trace!("LW MEM-4: {:x}: {:02x}", addr-4, self.mem[addr-4]);
+        log::trace!("LW MEM-3: {:x}: {:02x}", addr-3, self.mem[addr-3]);
+        log::trace!("LW MEM-2: {:x}: {:02x}", addr-2, self.mem[addr-2]);
+        log::trace!("LW MEM-1: {:x}: {:02x}", addr-1, self.mem[addr-1]);
+        log::trace!("LW MEM: {:x}: {:02x}", addr, self.mem[addr]);
+        log::trace!("LW MEM+1: {:x}: {:02x}", addr+1, self.mem[addr+1]);
+        log::trace!("LW MEM+2: {:x}: {:02x}", addr+2, self.mem[addr+2]);
+        log::trace!("LW MEM+3: {:x}: {:02x}", addr+3, self.mem[addr+3]);
+        log::trace!("LW MEM+4: {:x}: {:02x}", addr+4, self.mem[addr+4]);
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
@@ -386,19 +398,22 @@ impl VirtualMachine {
     /* S-Type */
     fn sb(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
+        let bytes = self.reg[rs2].to_le_bytes();
+        self.mem[addr] = bytes[0];
     }
     fn sh(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
-        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
+        let bytes = self.reg[rs2].to_le_bytes();
+        self.mem[addr] = bytes[0];
+        self.mem[addr + 1] = bytes[1];
     }
     fn sw(&mut self, rs1: usize, rs2: usize, imm12: u32) {
         let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        self.mem[addr] = (self.reg[rs2] & 0xff) as u8;
-        self.mem[addr + 1] = ((self.reg[rs2] & 0xff00) << 8) as u8;
-        self.mem[addr + 2] = ((self.reg[rs2] & 0xffff00) << 8) as u8;
-        self.mem[addr + 3] = ((self.reg[rs2] & 0xffffff00) << 8) as u8;
+        let bytes = self.reg[rs2].to_le_bytes();
+        self.mem[addr] = bytes[0];
+        self.mem[addr + 1] = bytes[1];
+        self.mem[addr + 2] = bytes[2];
+        self.mem[addr + 3] = bytes[3];
     }
 
     /* U-Type */
