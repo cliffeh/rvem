@@ -9,8 +9,9 @@ use std::process;
 const ENTRYPOINT_SYMNAME: &str = "_start";
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 const REG_NAMES: [&str; 32] = [
-    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3",
-    "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2",
+    "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+    "t3", "t4", "t5", "t6",
 ];
 
 pub const R_ZERO: usize = 0; /* hardwired to 0, ignores writes    */
@@ -49,6 +50,73 @@ pub const R_T6: usize = 31; /*  temporary register 6              */
 
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
 
+// enum Instruction
+// impl Instruction::execute()
+// impl Debug for Instruction
+include!(concat!(env!("OUT_DIR"), "/enum.rs"));
+
+// impl TryFrom<u32> for Instruction
+include!(concat!(env!("OUT_DIR"), "/decode.rs"));
+
+// impl std::fmt::Debug for Instruction {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Self::ADDI { rd, rs1, imm } => {
+//                 write!(f, "addi {rd}, {rs1}, {imm}")?;
+//             }
+//             _ => write!(f, "unknown")?
+//             // Self::LUI { rd, imm } => f.debug_struct("LUI").field("rd", rd).field("imm", imm).finish(),
+//             // Self::AUIPC { rd, imm } => f.debug_struct("AUIPC").field("rd", rd).field("imm", imm).finish(),
+//             // Self::JAL { rd, imm } => f.debug_struct("JAL").field("rd", rd).field("imm", imm).finish(),
+//             // Self::JALR { rd, rs1, imm } => f.debug_struct("JALR").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::BEQ { rs1, rs2, imm } => f.debug_struct("BEQ").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::BNE { rs1, rs2, imm } => f.debug_struct("BNE").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::BLT { rs1, rs2, imm } => f.debug_struct("BLT").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::BGE { rs1, rs2, imm } => f.debug_struct("BGE").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::BLTU { rs1, rs2, imm } => f.debug_struct("BLTU").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::BGEU { rs1, rs2, imm } => f.debug_struct("BGEU").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::LB { rd, rs1, imm } => f.debug_struct("LB").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::LH { rd, rs1, imm } => f.debug_struct("LH").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::LW { rd, rs1, imm } => f.debug_struct("LW").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::LBU { rd, rs1, imm } => f.debug_struct("LBU").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::LHU { rd, rs1, imm } => f.debug_struct("LHU").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::SB { rs1, rs2, imm } => f.debug_struct("SB").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::SH { rs1, rs2, imm } => f.debug_struct("SH").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::SW { rs1, rs2, imm } => f.debug_struct("SW").field("rs1", rs1).field("rs2", rs2).field("imm", imm).finish(),
+//             // Self::ADDI { rd, rs1, imm } => f.debug_struct("ADDI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::SLTI { rd, rs1, imm } => f.debug_struct("SLTI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::SLTIU { rd, rs1, imm } => f.debug_struct("SLTIU").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::XORI { rd, rs1, imm } => f.debug_struct("XORI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::ORI { rd, rs1, imm } => f.debug_struct("ORI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::ANDI { rd, rs1, imm } => f.debug_struct("ANDI").field("rd", rd).field("rs1", rs1).field("imm", imm).finish(),
+//             // Self::SLLI { rd, rs1, shamt } => f.debug_struct("SLLI").field("rd", rd).field("rs1", rs1).field("shamt", shamt).finish(),
+//             // Self::SRLI { rd, rs1, shamt } => f.debug_struct("SRLI").field("rd", rd).field("rs1", rs1).field("shamt", shamt).finish(),
+//             // Self::SRAI { rd, rs1, shamt } => f.debug_struct("SRAI").field("rd", rd).field("rs1", rs1).field("shamt", shamt).finish(),
+//             // Self::ADD { rd, rs1, rs2 } => f.debug_struct("ADD").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::SUB { rd, rs1, rs2 } => f.debug_struct("SUB").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::SLL { rd, rs1, rs2 } => f.debug_struct("SLL").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::SLT { rd, rs1, rs2 } => f.debug_struct("SLT").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::SLTU { rd, rs1, rs2 } => f.debug_struct("SLTU").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::XOR { rd, rs1, rs2 } => f.debug_struct("XOR").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::SRL { rd, rs1, rs2 } => f.debug_struct("SRL").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::SRA { rd, rs1, rs2 } => f.debug_struct("SRA").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::OR { rd, rs1, rs2 } => f.debug_struct("OR").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::AND { rd, rs1, rs2 } => f.debug_struct("AND").field("rd", rd).field("rs1", rs1).field("rs2", rs2).finish(),
+//             // Self::FENCE => write!(f, "FENCE"),
+//             // Self::FENCE_I => write!(f, "FENCE_I"),
+//             // Self::ECALL => write!(f, "ECALL"),
+//             // Self::EBREAK => write!(f, "EBREAK"),
+//             // Self::CSRRW => write!(f, "CSRRW"),
+//             // Self::CSRRS => write!(f, "CSRRS"),
+//             // Self::CSRRC => write!(f, "CSRRC"),
+//             // Self::CSRRWI => write!(f, "CSRRWI"),
+//             // Self::CSRRSI => write!(f, "CSRRSI"),
+//             // Self::CSRRCI => write!(f, "CSRRCI"),
+//         }
+//         Ok(())
+//     }
+// }
+
 pub struct VirtualMachine {
     pub pc: usize,
     pub reg: [u32; 32],
@@ -62,13 +130,23 @@ impl VirtualMachine {
         VirtualMachine {
             pc: 0x0,
             reg: [0u32; 32],
-            mem: vec![0u8; if let Some(n) = alloc { n } else { DEFAULT_MEMORY_SIZE }],
+            mem: vec![
+                0u8;
+                if let Some(n) = alloc {
+                    n
+                } else {
+                    DEFAULT_MEMORY_SIZE
+                }
+            ],
             sections: HashMap::new(),
             symtab: HashMap::new(),
         }
     }
 
-    pub fn load_from(path: &str, alloc: Option<usize>) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
+    pub fn load_from(
+        path: &str,
+        alloc: Option<usize>,
+    ) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
         let mut vm = VirtualMachine::new(alloc);
         vm.load(path)?;
         Ok(vm)
@@ -84,7 +162,12 @@ impl VirtualMachine {
         for section in &elf.section_headers {
             if section.is_alloc() {
                 let name = elf.shdr_strtab.get_at(section.sh_name).unwrap().to_string();
-                log::debug!("found section: {}; address: 0x{:x}, length: {} bytes", name, section.sh_addr, section.sh_size);
+                log::debug!(
+                    "found section: {}; address: 0x{:x}, length: {} bytes",
+                    name,
+                    section.sh_addr,
+                    section.sh_size
+                );
                 self.mem[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
                 self.sections.insert(name, section.vm_range());
             }
@@ -107,10 +190,17 @@ impl VirtualMachine {
             log::debug!("program entrypoint: 0x{:x}", pc);
             self.pc = *pc;
         } else if let Some(range) = self.sections.get(".text") {
-            log::warn!("program entrypoint {} not found; falling back to beginning of .text section: {:x}", ENTRYPOINT_SYMNAME, range.start);
+            log::warn!(
+                "program entrypoint {} not found; falling back to beginning of .text section: {:x}",
+                ENTRYPOINT_SYMNAME,
+                range.start
+            );
             self.pc = range.start;
         } else {
-            return Err(Box::new(io::Error::new(io::ErrorKind::InvalidData, "program entrypoint could not be determined")));
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "program entrypoint could not be determined",
+            )));
         }
 
         Ok(())
@@ -139,9 +229,10 @@ impl Default for VirtualMachine {
 
 impl std::fmt::Debug for VirtualMachine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // default behavior: dump registers
+        // default behavior: dump PC and registers
+        write!(f, "PC: 0x{:x} ", self.pc)?;
         for i in 0..self.reg.len() {
-            write!(f, "{}: 0x{:x} ", REG_NAMES[i], self.reg[i])?;
+            write!(f, " {}: 0x{:x}", REG_NAMES[i], self.reg[i])?;
         }
 
         // alternate behavior: also dump all sections in memory
@@ -150,8 +241,10 @@ impl std::fmt::Debug for VirtualMachine {
                 write!(f, "\n.text:")?;
                 let mut i = range.start;
                 while i < range.end {
-                    let inst = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
-                    write!(f, "\n  {:x}: {:08x} {}", i, inst, disassemble(i, inst))?;
+                    let word = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
+                    let inst = Instruction::try_from(word).unwrap();
+                    write!(f, "\n  {:x}: {:08x} {:?}", i, word, inst)?;
+
                     i += 4;
                 }
             }
@@ -170,13 +263,8 @@ impl std::fmt::Debug for VirtualMachine {
     }
 }
 
-fn disassemble(pc: usize, inst: u32) -> String {
-    let opcode = opcode!(inst);
-    include!(concat!(env!("OUT_DIR"), "/disasm.rs"))
-}
-
 impl VirtualMachine {
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<(), String> {
         while self.mem[self.pc] != 0 {
             // we'll just reset to zero each iteration rather than blocking writes
             self.reg[0] = 0;
@@ -186,18 +274,31 @@ impl VirtualMachine {
                 log::trace!("{self:?}");
             }
 
-            let inst = self.curr();
+            let word = self.curr();
+            let inst = Instruction::try_from(word).unwrap();
+            // let opcode = opcode!(inst);
 
             if log::log_enabled!(log::Level::Debug) {
-                log::debug!("{:x}: {:08x} {}", self.pc, inst, disassemble(self.pc, inst))
+                log::debug!(
+                    "{:x}: {:08x} {:?}",
+                    self.pc,
+                    word,
+                    inst
+                );
             }
 
-            let opcode = opcode!(inst);
-
-            include!(concat!(env!("OUT_DIR"), "/exec.rs"));
+            inst.execute(self);
 
             self.pc += 4;
         }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "rv32i")]
+impl VirtualMachine {
+    fn nop(&mut self) {
+        log::warn!("nop called");
     }
 
     /* B-Type (branches) */
@@ -245,10 +346,18 @@ impl VirtualMachine {
         self.reg[rd] = self.reg[rs1] | sext!(imm12, 12);
     }
     fn slti(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = if self.reg[rs1] < sext!(imm12, 12) { 1 } else { 0 };
+        self.reg[rd] = if self.reg[rs1] < sext!(imm12, 12) {
+            1
+        } else {
+            0
+        };
     }
     fn sltiu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = if (self.reg[rs1] as u32) < (sext!(imm12, 12) as u32) { 1 } else { 0 };
+        self.reg[rd] = if (self.reg[rs1] as u32) < (sext!(imm12, 12) as u32) {
+            1
+        } else {
+            0
+        };
     }
     fn xori(&mut self, rd: usize, rs1: usize, imm12: u32) {
         self.reg[rd] = self.reg[rs1] ^ sext!(imm12, 12);
@@ -306,7 +415,11 @@ impl VirtualMachine {
         self.reg[rd] = self.reg[rs1] << self.reg[rs2];
     }
     fn slt(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = if (self.reg[rs1] as i32) < (self.reg[rs2] as i32) { 1 } else { 0 };
+        self.reg[rd] = if (self.reg[rs1] as i32) < (self.reg[rs2] as i32) {
+            1
+        } else {
+            0
+        };
     }
     fn sltu(&mut self, rd: usize, rs1: usize, rs2: usize) {
         self.reg[rd] = if self.reg[rs1] < self.reg[rs2] { 1 } else { 0 };
@@ -324,13 +437,13 @@ impl VirtualMachine {
         self.reg[rd] = self.reg[rs1] ^ self.reg[rs2];
     }
 
-    fn slli(&mut self, rd: usize, rs1: usize, shamt: usize) {
+    fn slli(&mut self, rd: usize, rs1: usize, shamt: u32) {
         self.reg[rd] = self.reg[rs1] << shamt;
     }
-    fn srli(&mut self, rd: usize, rs1: usize, shamt: usize) {
+    fn srli(&mut self, rd: usize, rs1: usize, shamt: u32) {
         self.reg[rd] = self.reg[rs1] >> shamt;
     }
-    fn srai(&mut self, rd: usize, rs1: usize, shamt: usize) {
+    fn srai(&mut self, rd: usize, rs1: usize, shamt: u32) {
         self.reg[rd] = ((self.reg[rs1] as i32) >> shamt) as u32;
     }
 
@@ -378,7 +491,10 @@ impl VirtualMachine {
                     len += 1;
                 }
 
-                print!("{}", String::from_utf8(self.mem[pos..pos + len].into()).unwrap());
+                print!(
+                    "{}",
+                    String::from_utf8(self.mem[pos..pos + len].into()).unwrap()
+                );
                 std::io::stdout().flush().unwrap();
             }
             5 => {
@@ -394,7 +510,12 @@ impl VirtualMachine {
             }
             64 => {
                 // RISC-V write
-                log::trace!("RISC-V linux write syscall: fp: {} addr: {:x} len: {}", self.reg[R_A0], self.reg[R_A1], self.reg[R_A2]);
+                log::trace!(
+                    "RISC-V linux write syscall: fp: {} addr: {:x} len: {}",
+                    self.reg[R_A0],
+                    self.reg[R_A1],
+                    self.reg[R_A2]
+                );
 
                 let mut fp = unsafe { File::from_raw_fd(self.reg[R_A0] as i32) };
                 let addr = self.reg[R_A1] as usize;
@@ -444,6 +565,14 @@ macro_rules! rs1 {
 macro_rules! rs2 {
     ($inst:expr) => {
         ((($inst >> 20) & 0b1_1111) as usize)
+    };
+}
+
+// same as rs2!, but as u32
+#[macro_export]
+macro_rules! shamt {
+    ($inst:expr) => {
+        (($inst >> 20) & 0b1_1111)
     };
 }
 

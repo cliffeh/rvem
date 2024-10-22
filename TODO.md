@@ -1,10 +1,8 @@
 * refactor to make rvem a subproject (rename repo 'rv'?)
 * cleanup (god there's some awful shit here)
-* rectify RISC-V+Linux vs. MIPS syscalls
 * go for RV32m (multiply) extensions?
   * maybe with separate feature flags/targets for what it supports
 * test coverage for individual instructions?
-* beautifier for asm files?
 * precommit hook for beautification
 * github CI workflows for build/test
   * this could be tough (would require risc-v tools)

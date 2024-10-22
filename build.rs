@@ -1,237 +1,280 @@
 // build.rs
 
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::fs::read_to_string;
 use std::path::Path;
+use syn::Ident;
+
+fn sanitize_name(name: &str) -> String {
+    name.replace(".", "_")
+}
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    let exec_path = Path::new(&out_dir).join("exec.rs");
-    let disasm_path = Path::new(&out_dir).join("disasm.rs"); // TODO
+    let decode_path = Path::new(&out_dir).join("decode.rs");
+    let enum_path = Path::new(&out_dir).join("enum.rs");
 
-    let mut exec_cases = String::new();
-    let mut disasm_cases = String::new();
+    let mut variants: Vec<TokenStream> = vec![];
 
-    let mut btype: HashMap<String, HashMap<String, String>> = HashMap::new();
-    let mut itype: HashMap<String, HashMap<String, String>> = HashMap::new();
-    let mut shamt: HashMap<String, HashMap<String, HashMap<String, String>>> = HashMap::new();
-    let mut rtype: HashMap<String, HashMap<String, HashMap<String, String>>> = HashMap::new();
-    let mut stype: HashMap<String, HashMap<String, String>> = HashMap::new();
+    let mut btype: HashMap<u32, HashMap<u32, Ident>> = HashMap::new();
+    let mut itype: HashMap<u32, HashMap<u32, Ident>> = HashMap::new();
+    let mut shamt: HashMap<u32, HashMap<u32, HashMap<u32, Ident>>> = HashMap::new();
+    let mut rtype: HashMap<u32, HashMap<u32, HashMap<u32, Ident>>> = HashMap::new();
+    let mut stype: HashMap<u32, HashMap<u32, Ident>> = HashMap::new();
 
-    let preamble = r#"match opcode {"#;
+    let mut opcode_matches: Vec<TokenStream> = vec![];
+    let mut exec_matches: Vec<TokenStream> = vec![];
 
+    #[cfg(feature = "rv32i")]
     for line in read_to_string("src/rv32i.tab").unwrap().lines() {
         let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
 
+        let opname = format_ident!("{}", sanitize_name(pieces[pieces.len() - 1]));
+        let lcname = sanitize_name(pieces[pieces.len() - 1]).to_lowercase();
+        let funname = format_ident!("{}", lcname);
+        let opcode = u32::from_str_radix(pieces[pieces.len() - 2], 2).unwrap();
+
         // TODO this will work for now, but could use refinement/refactoring
         match pieces[0] {
-            // imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
+            // B-Type: imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
             "imm[12|10:5]" => {
-                // B-Type
-                let funct3 = btype.entry(pieces[5].into()).or_default();
-                funct3.insert(pieces[3].into(), pieces[6].into());
-            }
-            // imm[11:0] rs1 000 rd 0010011 ADDI
-            "imm[11:0]" => {
-                // I-Type
-                let funct3 = itype.entry(pieces[4].into()).or_default();
-                funct3.insert(pieces[2].into(), pieces[5].into());
-            }
-            // imm[20|10:1|11|19:12] rd 1101111 JAL
-            "imm[20|10:1|11|19:12]" => {
-                // J-Type
-                exec_cases += &format!("0b{} => self.{}(rd!(inst), imm_j!(inst)),\n", pieces[2], pieces[3].to_lowercase());
-                disasm_cases += &format!(
-                    "0b{} => format!(\"{} {{:x}}\", (pc as u32).wrapping_add(sext!(imm_j!(inst), 20))),\n",
-                    pieces[2],
-                    pieces[3].to_lowercase()
+                variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
+                exec_matches.push(
+                    quote! {Instruction::#opname{rs1, rs2, imm} => vm.#funname(*rs1, *rs2, *imm)},
                 );
+
+                let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                let funct3s = btype.entry(opcode).or_default();
+                funct3s.insert(funct3, opname);
             }
-            // 0000000 rs2 rs1 000 rd 0110011 ADD
+            // I-Type: imm[11:0] rs1 000 rd 0010011 ADDI
+            "imm[11:0]" => {
+                variants.push(quote! {#opname{rd: usize, rs1: usize, imm: u32}});
+                exec_matches.push(
+                    quote! {Instruction::#opname{rd, rs1, imm} => vm.#funname(*rd, *rs1, *imm)},
+                );
+
+                let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
+                let funct3s = itype.entry(opcode).or_default();
+                funct3s.insert(funct3, opname);
+            }
+            // J-Type: imm[20|10:1|11|19:12] rd 1101111 JAL
+            "imm[20|10:1|11|19:12]" => {
+                variants.push(quote! {#opname{rd: usize,  imm: u32}});
+                exec_matches.push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
+
+                opcode_matches.push(quote! {
+                    #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: imm_j!(inst)})
+                });
+            }
+            // R-Type: 0000000 rs2 rs1 000 rd 0110011 ADD
             "0000000" | "0100000" => {
-                // R-Type/shamt
+                let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                let funct7 = u32::from_str_radix(pieces[0], 2).unwrap();
+                // shamt (special case): 0000000 shamt rs1 001 rd 0010011 SLLI
                 if pieces[1] == "shamt" {
-                    // 0000000 shamt rs1 001 rd 0010011 SLLI
-                    let funct3 = shamt.entry(pieces[5].into()).or_default();
-                    let funct7 = funct3.entry(pieces[3].into()).or_default();
-                    funct7.insert(pieces[0].into(), pieces[6].into());
+                    variants.push(quote! {#opname{rd: usize, rs1: usize, shamt: u32}});
+                    exec_matches.push(quote!{Instruction::#opname{rd, rs1, shamt} => vm.#funname(*rd, *rs1, *shamt)});
+
+                    let funct3s = shamt.entry(opcode).or_default();
+                    let funct7s = funct3s.entry(funct3).or_default();
+                    funct7s.insert(funct7, opname);
                 } else {
-                    let funct3 = rtype.entry(pieces[5].into()).or_default();
-                    let funct7 = funct3.entry(pieces[3].into()).or_default();
-                    funct7.insert(pieces[0].into(), pieces[6].into());
+                    // 0000000 rs2 rs1 000 rd 0110011 ADD
+                    variants.push(quote! {#opname{rd: usize, rs1: usize, rs2: usize}});
+                    exec_matches.push(
+                        quote! {Instruction::#opname{rd, rs1, rs2} => vm.#funname(*rd, *rs1, *rs2)},
+                    );
+
+                    let funct3s = rtype.entry(opcode).or_default();
+                    let funct7s = funct3s.entry(funct3).or_default();
+                    funct7s.insert(funct7, opname);
                 }
             }
-            // imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
+            // S-Type: imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
             "imm[11:5]" => {
-                // S-Type
-                let funct3 = stype.entry(pieces[5].into()).or_default();
-                funct3.insert(pieces[3].into(), pieces[6].into());
+                variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
+                exec_matches.push(
+                    quote! {Instruction::#opname{rs1, rs2, imm} => vm.#funname(*rs1, *rs2, *imm)},
+                );
+
+                let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                let funct3s = stype.entry(opcode).or_default();
+                funct3s.insert(funct3, opname);
             }
-            // imm[31:12] rd 0110111 LUI
+            // U-Type: imm[31:12] rd 0110111 LUI
             "imm[31:12]" => {
-                // U-Type
-                exec_cases += &format!("0b{} => self.{}(rd!(inst), inst >> 12),\n", pieces[2], pieces[3].to_lowercase());
-                disasm_cases +=
-                    &format!("0b{} => format!(\"{} {{}}, 0x{{:x}}\", REG_NAMES[rd!(inst)], inst >> 12),\n", pieces[2], pieces[3].to_lowercase());
+                variants.push(quote! {#opname{rd: usize, imm: u32}});
+                exec_matches.push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
+
+                opcode_matches.push(quote! {
+                    #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: inst >> 12})
+                });
             }
             // TODO is there a way to output build warnings about ignored lines?
-            _ => {}
+            _ => {
+                variants.push(quote! {#opname});
+                if opname == "ECALL" {
+                    // TODO get rid of this?
+                    opcode_matches.push(quote! {
+                        #opcode => Ok(Instruction::ECALL)
+                    });
+                    exec_matches.push(quote! {Instruction::ECALL => vm.ecall()});
+                } else {
+                    exec_matches.push(quote! {Instruction::#opname => vm.nop()});
+                }
+            }
         }
     }
 
     // B-Type
-    for (opcode, subcodes) in btype {
-        exec_cases += &format!("0b{} => {{\n", opcode);
-        exec_cases += &format!("let funct3 = funct3!(inst);\n");
-        exec_cases += "match funct3 {";
-        disasm_cases += &format!("0b{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
-        for (funct3, op) in subcodes {
-            exec_cases += &format!("0b{} => self.{}(rs1!(inst), rs2!(inst), imm_b!(inst)),\n", funct3, op.to_lowercase());
-            disasm_cases += &format!(
-                "0b{} => format!(\"{} {{}}, {{}}, {{:x}}\", rs1!(inst), rs2!(inst), pc as u32+sext!(imm_b!(inst), 12)),\n",
-                funct3,
-                op.to_lowercase()
-            );
+    for (opcode, funct3s) in btype {
+        let mut funct3_matches: Vec<TokenStream> = vec![];
+        for (funct3, opname) in funct3s {
+            funct3_matches.push(quote!{
+                #funct3 => Ok(Instruction::#opname{rs1: rs1!(inst), rs2: rs2!(inst), imm: imm_b!(inst)})
+            });
         }
-        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        exec_cases += "}},";
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        opcode_matches.push(quote! {
+            #opcode => {
+                let funct3 = funct3!(inst);
+                match funct3 {
+                    #(#funct3_matches,)*
+                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
+                }
+            }
+        })
     }
 
     // I-Type
     for (opcode, funct3s) in itype {
-        exec_cases += &format!("0b{} => {{\n", opcode);
-        exec_cases += &format!("let funct3 = funct3!(inst);\n");
-        exec_cases += "match funct3 {";
-        disasm_cases += &format!("0b{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
-        for (funct3, op) in funct3s {
-            exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), inst >> 20),\n", funct3, op.to_lowercase());
-            disasm_cases += &format!(
-                "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], sext!(inst >> 20, 12)),",
-                funct3,
-                op.to_lowercase()
-            );
+        let mut funct3_matches: Vec<TokenStream> = vec![];
+        for (funct3, opname) in funct3s {
+            funct3_matches.push(quote! {
+                #funct3 => Ok(Instruction::#opname{rd: rd!(inst), rs1: rs1!(inst), imm: inst >> 20})
+            });
         }
-        // special case for I-Types w/shamt instead of rs2
-        if let Some(funct3s) = shamt.get(&opcode) {
-            for (funct3, funct7s) in funct3s {
-                exec_cases += &format!("0b{} => {{", funct3);
-                exec_cases += &format!("let funct7 = funct7!(inst);\n");
-                exec_cases += "match funct7 {";
-                disasm_cases += &format!("0b{} => {{", funct3);
-                disasm_cases += &format!("let funct7 = funct7!(inst);\n");
-                disasm_cases += "match funct7 {";
-                for (funct7, op) in funct7s {
-                    exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), rs2!(inst)),\n", funct7, op.to_lowercase());
-                    disasm_cases += &format!(
-                        "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], rs2!(inst)),\n",
-                        funct7,
-                        op.to_lowercase()
-                    );
+        opcode_matches.push(quote! {
+            #opcode => {
+                let funct3 = funct3!(inst);
+                match funct3 {
+                    #(#funct3_matches,)*
+                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
                 }
-                exec_cases +=
-                    "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
-                exec_cases += "}},";
-                disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-                disasm_cases += "}},";
             }
-        }
-        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        exec_cases += "}},";
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        });
     }
 
     // R-Type
     for (opcode, funct3s) in rtype {
-        exec_cases += &format!("0b{} => {{\n", opcode);
-        exec_cases += &format!("let funct3 = funct3!(inst);\n");
-        exec_cases += "match funct3 {";
-        disasm_cases += &format!("0b{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
+        let mut funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, funct7s) in funct3s {
-            exec_cases += &format!("0b{} => {{", funct3);
-            exec_cases += &format!("let funct7 = funct7!(inst);\n");
-            exec_cases += "match funct7 {";
-            disasm_cases += &format!("0b{} => {{", funct3);
-            disasm_cases += &format!("let funct7 = funct7!(inst);\n");
-            disasm_cases += "match funct7 {";
-            for (funct7, op) in funct7s {
-                exec_cases += &format!("0b{} => self.{}(rd!(inst), rs1!(inst), rs2!(inst)),\n", funct7, op.to_lowercase());
-                disasm_cases += &format!(
-                    "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], REG_NAMES[rs2!(inst)]),\n",
-                    funct7,
-                    op.to_lowercase()
-                );
+            let mut funct7_matches: Vec<TokenStream> = vec![];
+            for (funct7, opname) in funct7s {
+                funct7_matches.push(quote!{
+                    #funct7 => Ok(Instruction::#opname{rd: rd!(inst), rs1: rs1!(inst), rs2: rs2!(inst)})
+                });
             }
-            exec_cases +=
-                "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3+funct7: {:07b} {:03b} {:07b}\", self.pc, inst, opcode, funct3, funct7)";
-            exec_cases += "}},";
-            disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-            disasm_cases += "}},";
+            funct3_matches.push(quote!{
+                #funct3 => {
+                    let funct7 = funct7!(inst);
+                    match funct7 {
+                        #(#funct7_matches,)*
+                        _ => { Err(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))}
+                    }
+                }
+            });
         }
-        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        exec_cases += "}},";
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        // special case for I-Types w/shamt instead of rs2
+        if let Some(funct3s) = shamt.get(&opcode) {
+            for (funct3, funct7s) in funct3s {
+                let mut funct7_matches: Vec<TokenStream> = vec![];
+                for (funct7, opname) in funct7s {
+                    funct7_matches.push(quote!{
+                        #funct7 => Ok(Instruction::#opname{rd: rd!(inst), rs1: rs1!(inst), shamt: shamt!(inst)})
+                    });
+                }
+                funct3_matches.push(quote!{
+                    #funct3 => {
+                        let funct7 = funct7!(inst);
+                        match funct7 {
+                            #(#funct7_matches,)*
+                            _ => { Err(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))}
+                        }
+                    }
+                });
+            }
+        }
+        opcode_matches.push(quote! {
+            #opcode => {
+                let funct3 = funct3!(inst);
+                match funct3 {
+                    #(#funct3_matches,)*
+                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
+                }
+            }
+        });
     }
 
     // S-Type
     for (opcode, funct3s) in stype {
-        exec_cases += &format!("0b{} => {{\n", opcode);
-        exec_cases += &format!("let funct3 = funct3!(inst);\n");
-        exec_cases += "match funct3 {";
-        disasm_cases += &format!("0b{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
-        for (funct3, op) in funct3s {
-            exec_cases += &format!("0b{} => self.{}(rs1!(inst), rs2!(inst), imm_s!(inst)),\n", funct3, op.to_lowercase());
-            disasm_cases += &format!(
-                "0b{} => format!(\"{} {{}}, {{}}({{}})\", REG_NAMES[rs2!(inst)], sext!(imm_s!(inst), 12), REG_NAMES[rs1!(inst)]),",
-                funct3,
-                op.to_lowercase()
-            );
+        let mut funct3_matches: Vec<TokenStream> = vec![];
+        for (funct3, opname) in funct3s {
+            funct3_matches.push(quote!{
+                #funct3 => Ok(Instruction::#opname{rs1: rs1!(inst), rs2: rs2!(inst), imm: imm_s!(inst)})
+            });
         }
-        exec_cases += "_ => log::error!(\"{:x} {:08x}: unknown opcode+funct3: {:07b} {:03b}\", self.pc, inst, opcode, funct3)";
-        exec_cases += "}},";
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        opcode_matches.push(quote! {
+            #opcode => {
+                let funct3 = funct3!(inst);
+                match funct3 {
+                    #(#funct3_matches,)*
+                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
+                }
+            }
+        })
     }
 
-    let exec_postamble = r#"0b1110011 => {
-                    if inst == 0b1110011 { // ECALL
-                        self.ecall();
-                    } else {
-                        log::error!("{:x} {:08x}: unimplemented environment call", self.pc, inst);
-                    }
-                }
-                _ => {
-                    log::error!("{:x} {:08x}: unimplemented opcode: {:07b}", self.pc, inst, opcode);
-                }
-            }"#;
+    let enum_output = quote! {
+        #[derive(Debug)]
+        #[allow(non_camel_case_types)] // keep the compiler from griping about FENCE_I
+        pub enum Instruction {
+           #(#variants),*
+        }
 
-    let disasm_postamble = r#"0b1110011 => {
-                    if inst == 0b1110011 { // ECALL
-                        "ecall".to_string()
-                    } else {
-                        "unknown/unimplemented".to_string()
-                    }
+        impl Instruction {
+            fn execute(&self, vm: &mut VirtualMachine) {
+                match self {
+                    #(#exec_matches),*
                 }
-                _ => {
-                    "unknown/unimplemented".to_string()
-                }
-            }"#;
+            }
+        }
+    };
+    let syntax_tree = syn::parse2(enum_output).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+    fs::write(&enum_path, formatted).unwrap();
 
-    fs::write(&exec_path, format!("{preamble} {exec_cases} {exec_postamble}")).unwrap();
-    fs::write(&disasm_path, format!("{preamble} {disasm_cases} {disasm_postamble}")).unwrap();
+    let decode_output = quote! {
+        impl TryFrom<u32> for Instruction {
+            type Error = String;
+
+            fn try_from(inst: u32) -> Result<Self, Self::Error> {
+                let opcode = opcode!(inst);
+                match opcode {
+                    #(#opcode_matches,)*
+                    _ => Err(format!("unknown/unimplemented opcode: {:07b}", opcode))
+                }
+            }
+        }
+    };
+    let syntax_tree = syn::parse2(decode_output).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+    fs::write(&decode_path, formatted).unwrap();
+
     println!("cargo::rerun-if-changed=src/lib.rs");
     println!("cargo::rerun-if-changed=src/rv32i.tab");
 }
