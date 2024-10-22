@@ -163,7 +163,7 @@ impl Emulator {
 
             // TODO better disassembly
             if log::log_enabled!(log::Level::Debug) {
-                log::debug!("{:x}: {:08x} {:?}", self.pc, word, inst);
+                log::debug!("{:x}: {:08x} {}", self.pc, word, inst);
             }
 
             inst.execute(self);
@@ -217,7 +217,7 @@ impl std::fmt::Debug for Emulator {
                 while i < range.end {
                     let word = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
                     let inst = Instruction::try_from(word).unwrap();
-                    write!(f, "\n  {:x}: {:08x} {:?}", i, word, inst)?;
+                    write!(f, "\n  {:x}: {:08x} {:.*}", i, word, i, inst)?;
 
                     i += 4;
                 }
@@ -354,7 +354,7 @@ impl Emulator {
     /* J-Type */
     fn jal(&mut self, rd: usize, imm20: u32) {
         self.reg[rd] = (self.pc + 4) as u32;
-        let addr = (self.pc as u32).wrapping_add(sext!(imm20, 20)) - 4; // NB subtract 4 since we're auto-incrementing
+        let addr = (self.pc as i32 + sext!(imm20, 20) as i32) - 4; // NB subtract 4 since we're auto-incrementing
         self.pc = addr as usize;
     }
 
@@ -535,6 +535,88 @@ impl Emulator {
 
     fn remu(&mut self, rd: usize, rs1: usize, rs2: usize) {
         self.reg[rd] = self.reg[rs1] % self.reg[rs2];
+    }
+}
+
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            #[cfg(feature = "rv32i")]
+            Instruction::ADDI { rd, rs1, imm } => {
+                if *rs1 == 0 {
+                    write!(f, "li {}, {}", REG_NAMES[*rd], sext!(*imm, 12) as i32)
+                } else {
+                    write!(
+                        f,
+                        "addi {}, {}, {}",
+                        REG_NAMES[*rd],
+                        REG_NAMES[*rs1],
+                        sext!(*imm, 12) as i32
+                    )?;
+
+                    Ok(())
+                }
+            }
+
+            #[cfg(feature = "rv32i")]
+            Instruction::ORI { rd, rs1, imm } => {
+                write!(
+                    f,
+                    "or {}, {}, {}",
+                    REG_NAMES[*rd],
+                    REG_NAMES[*rs1],
+                    sext!(*imm, 12) as i32
+                )
+            }
+
+            #[cfg(feature = "rv32i")]
+            Instruction::AUIPC { rd, imm } => {
+                write!(f, "auipc {}, 0x{:x}", REG_NAMES[*rd], *imm)
+            }
+            #[cfg(feature = "rv32i")]
+            Instruction::LW { rd, rs1, imm } => {
+                write!(
+                    f,
+                    "lw {}, {}({})",
+                    REG_NAMES[*rd],
+                    sext!(*imm, 12) as i32,
+                    REG_NAMES[*rs1]
+                )
+            }
+            #[cfg(feature = "rv32i")]
+            Instruction::BEQ { rs1, rs2, imm } => {
+                let addr = if let Some(pc) = f.precision() {
+                    format!("{:x}", pc as i32 + sext!(*imm, 12) as i32)
+                } else {
+                    format!("PC+{}", sext!(*imm, 12) as i32)
+                };
+                write!(f, "beq {}, {}, {addr}", REG_NAMES[*rs1], REG_NAMES[*rs2])
+            }
+
+            #[cfg(feature = "rv32i")]
+            Instruction::ADD { rd, rs1, rs2 } => {
+                write!(
+                    f,
+                    "add {}, {}, {}",
+                    REG_NAMES[*rd], REG_NAMES[*rs1], REG_NAMES[*rs2]
+                )
+            }
+
+            #[cfg(feature = "rv32i")]
+            Instruction::JAL { rd, imm } => {
+                if let Some(pc) = f.precision() {
+                    write!(f, "j {:x}", (pc as i32 + sext!(*imm, 20) as i32))
+                } else {
+                    write!(f, "jal {:x}", *imm)
+                }
+            }
+
+            #[cfg(feature = "rv32i")]
+            Instruction::ECALL => write!(f, "ecall"),
+            _ => {
+                write!(f, "{:?}", self)
+            }
+        }
     }
 }
 

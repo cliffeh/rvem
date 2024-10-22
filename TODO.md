@@ -11,4 +11,4 @@
 * handle errors for things like:
   * trying to write to .text
   * attempt to divide by zero
-
+* implement more fmt::Display cases for Instruction
