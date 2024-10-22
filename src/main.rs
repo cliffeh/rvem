@@ -1,6 +1,6 @@
-use ::rvem::VirtualMachine;
+use ::rvem::Emulator;
 use clap::Parser;
-use rvem::DEFAULT_MEMORY_SIZE;
+use rvem::{EmulatorError, DEFAULT_MEMORY_SIZE};
 use std::{env, process};
 
 #[derive(Parser, Debug)]
@@ -26,7 +26,7 @@ struct Args {
     file: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), EmulatorError> {
     let args = Args::parse();
 
     if let Some(log_level) = args.log_level {
@@ -35,16 +35,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     env_logger::init();
 
-    let mut vm: VirtualMachine = VirtualMachine::load_from(&args.file, Some(args.memory))?;
+    let mut em: Emulator = Emulator::load_from(&args.file, Some(args.memory))?;
 
     if args.dump {
-        println!("{vm:#?}");
+        println!("{em:#?}");
         process::exit(0);
     } else if log::log_enabled!(log::Level::Trace) {
-        log::trace!("{:#?}", vm);
+        log::trace!("{:#?}", em);
     }
 
-    vm.run()?;
-
-    Ok(())
+    em.run()
 }

@@ -5,6 +5,7 @@ use std::io::{self, Read, Write};
 use std::ops::Range;
 use std::os::fd::FromRawFd;
 use std::process;
+use thiserror::Error;
 
 const ENTRYPOINT_SYMNAME: &str = "_start";
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
@@ -58,7 +59,7 @@ include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 // impl TryFrom<u32> for Instruction
 include!(concat!(env!("OUT_DIR"), "/decode.rs"));
 
-pub struct VirtualMachine {
+pub struct Emulator {
     pub pc: usize,
     pub reg: [u32; 32],
     pub mem: Vec<u8>,
@@ -66,9 +67,9 @@ pub struct VirtualMachine {
     pub symtab: HashMap<String, usize>,
 }
 
-impl VirtualMachine {
-    pub fn new(alloc: Option<usize>) -> VirtualMachine {
-        VirtualMachine {
+impl Emulator {
+    pub fn new(alloc: Option<usize>) -> Emulator {
+        Emulator {
             pc: 0x0,
             reg: [0u32; 32],
             mem: vec![
@@ -84,16 +85,13 @@ impl VirtualMachine {
         }
     }
 
-    pub fn load_from(
-        path: &str,
-        alloc: Option<usize>,
-    ) -> Result<VirtualMachine, Box<dyn std::error::Error>> {
-        let mut vm = VirtualMachine::new(alloc);
-        vm.load(path)?;
-        Ok(vm)
+    pub fn load_from(path: &str, alloc: Option<usize>) -> Result<Emulator, EmulatorError> {
+        let mut em = Emulator::new(alloc);
+        em.load(path)?;
+        Ok(em)
     }
 
-    pub fn load(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn load(&mut self, path: &str) -> Result<(), EmulatorError> {
         let mut file = File::open(path)?;
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)?;
@@ -138,16 +136,48 @@ impl VirtualMachine {
             );
             self.pc = range.start;
         } else {
-            return Err(Box::new(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "program entrypoint could not be determined",
-            )));
+            return Err(EmulatorError::EntryPointError);
         }
 
         // TODO find a better place for the stack pointer than "in the middle"...
-        self.reg[R_SP] = (self.mem.len() / 2) as u32;
+        self.reg[R_SP] = ((self.mem.len() / 8) * 4) as u32;
 
         Ok(())
+    }
+
+    pub fn run(&mut self) -> Result<(), EmulatorError> {
+        let text_range = self.sections.get(".text").unwrap().clone();
+
+        while text_range.contains(&self.pc) {
+            // we'll just reset to zero each iteration rather than blocking writes
+            self.reg[0] = 0;
+
+            if log::log_enabled!(log::Level::Trace) {
+                // dump registers
+                log::trace!("{self:?}");
+            }
+
+            let word = self.curr();
+            let inst = Instruction::try_from(word).unwrap();
+            // let opcode = opcode!(inst);
+
+            // TODO better disassembly
+            if log::log_enabled!(log::Level::Debug) {
+                log::debug!("{:x}: {:08x} {:?}", self.pc, word, inst);
+            }
+
+            inst.execute(self);
+
+            self.pc += 4;
+        }
+
+        if text_range.contains(&self.pc) {
+            Ok(())
+        } else {
+            Err(EmulatorError::ExecutionError(
+                "program counter outside bounds of .text section".into(),
+            ))
+        }
     }
 
     pub fn curr(&self) -> u32 {
@@ -159,7 +189,7 @@ impl VirtualMachine {
     }
 }
 
-impl Default for VirtualMachine {
+impl Default for Emulator {
     fn default() -> Self {
         Self {
             pc: Default::default(),
@@ -171,7 +201,7 @@ impl Default for VirtualMachine {
     }
 }
 
-impl std::fmt::Debug for VirtualMachine {
+impl std::fmt::Debug for Emulator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // default behavior: dump PC and registers
         write!(f, "PC: 0x{:x} ", self.pc)?;
@@ -207,35 +237,23 @@ impl std::fmt::Debug for VirtualMachine {
     }
 }
 
-impl VirtualMachine {
-    pub fn run(&mut self) -> Result<(), String> {
-        while self.mem[self.pc] != 0 {
-            // we'll just reset to zero each iteration rather than blocking writes
-            self.reg[0] = 0;
+#[derive(Error, Debug)]
+pub enum EmulatorError {
+    #[error("{0}")]
+    IOError(#[from] io::Error),
 
-            if log::log_enabled!(log::Level::Trace) {
-                // dump registers
-                log::trace!("{self:?}");
-            }
+    #[error("error parsing ELF data: {0}")]
+    ElfError(#[from] goblin::error::Error),
 
-            let word = self.curr();
-            let inst = Instruction::try_from(word).unwrap();
-            // let opcode = opcode!(inst);
+    #[error("program entrypoint could not be located")]
+    EntryPointError,
 
-            if log::log_enabled!(log::Level::Debug) {
-                log::debug!("{:x}: {:08x} {:?}", self.pc, word, inst);
-            }
-
-            inst.execute(self);
-
-            self.pc += 4;
-        }
-        Ok(())
-    }
+    #[error("execution error: {0}")]
+    ExecutionError(String),
 }
 
 #[cfg(feature = "rv32i")]
-impl VirtualMachine {
+impl Emulator {
     fn nop(&mut self) {
         log::warn!("nop called");
     }
@@ -483,7 +501,7 @@ impl VirtualMachine {
 }
 
 #[cfg(feature = "rv32m")]
-impl VirtualMachine {
+impl Emulator {
     /* R-Type */
     // NB all multiplication extensions are R-Type
     fn mul(&mut self, rd: usize, rs1: usize, rs2: usize) {

@@ -52,7 +52,7 @@ fn main() {
                 "imm[12|10:5]" => {
                     variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
                     exec_matches.push(
-                    quote! {Instruction::#opname{rs1, rs2, imm} => vm.#funname(*rs1, *rs2, *imm)},
+                    quote! {Instruction::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
                 );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
@@ -63,7 +63,7 @@ fn main() {
                 "imm[11:0]" => {
                     variants.push(quote! {#opname{rd: usize, rs1: usize, imm: u32}});
                     exec_matches.push(
-                        quote! {Instruction::#opname{rd, rs1, imm} => vm.#funname(*rd, *rs1, *imm)},
+                        quote! {Instruction::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)},
                     );
 
                     let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
@@ -74,7 +74,7 @@ fn main() {
                 "imm[20|10:1|11|19:12]" => {
                     variants.push(quote! {#opname{rd: usize,  imm: u32}});
                     exec_matches
-                        .push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
+                        .push(quote! {Instruction::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
                         #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: imm_j!(inst)})
@@ -87,7 +87,7 @@ fn main() {
                     // shamt (special case): 0000000 shamt rs1 001 rd 0010011 SLLI
                     if pieces[1] == "shamt" {
                         variants.push(quote! {#opname{rd: usize, rs1: usize, shamt: u32}});
-                        exec_matches.push(quote!{Instruction::#opname{rd, rs1, shamt} => vm.#funname(*rd, *rs1, *shamt)});
+                        exec_matches.push(quote!{Instruction::#opname{rd, rs1, shamt} => em.#funname(*rd, *rs1, *shamt)});
 
                         let funct3s = shamt.entry(opcode).or_default();
                         let funct7s = funct3s.entry(funct3).or_default();
@@ -96,7 +96,7 @@ fn main() {
                         // 0000000 rs2 rs1 000 rd 0110011 ADD
                         variants.push(quote! {#opname{rd: usize, rs1: usize, rs2: usize}});
                         exec_matches.push(
-                        quote! {Instruction::#opname{rd, rs1, rs2} => vm.#funname(*rd, *rs1, *rs2)},
+                        quote! {Instruction::#opname{rd, rs1, rs2} => em.#funname(*rd, *rs1, *rs2)},
                     );
 
                         let funct3s = rtype.entry(opcode).or_default();
@@ -108,7 +108,7 @@ fn main() {
                 "imm[11:5]" => {
                     variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
                     exec_matches.push(
-                    quote! {Instruction::#opname{rs1, rs2, imm} => vm.#funname(*rs1, *rs2, *imm)},
+                    quote! {Instruction::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
                 );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
@@ -119,7 +119,7 @@ fn main() {
                 "imm[31:12]" => {
                     variants.push(quote! {#opname{rd: usize, imm: u32}});
                     exec_matches
-                        .push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
+                        .push(quote! {Instruction::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
                         #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: inst >> 12})
@@ -133,9 +133,9 @@ fn main() {
                         opcode_matches.push(quote! {
                             #opcode => Ok(Instruction::ECALL)
                         });
-                        exec_matches.push(quote! {Instruction::ECALL => vm.ecall()});
+                        exec_matches.push(quote! {Instruction::ECALL => em.ecall()});
                     } else {
-                        exec_matches.push(quote! {Instruction::#opname => vm.nop()});
+                        exec_matches.push(quote! {Instruction::#opname => em.nop()});
                     }
                 }
             }
@@ -258,7 +258,7 @@ fn main() {
         }
 
         impl Instruction {
-            fn execute(&self, vm: &mut VirtualMachine) {
+            fn execute(&self, em: &mut Emulator) {
                 match self {
                     #(#exec_matches),*
                 }
