@@ -296,6 +296,7 @@ fn main() {
     // variants.push(quote!{#vname{rd: usize}});
     // variants.push(quote! {ECALL,});
     let output = quote! {
+        #[derive(Debug)]
         pub enum Instruction {
            #(#variants),*
         }

@@ -324,6 +324,7 @@ impl Instruction {
                 }
                 Ok(vm.pc + 4)
             }
+            _ => Err("unimplemented".into()),
         }
     }
 }
