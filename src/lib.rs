@@ -220,12 +220,7 @@ impl VirtualMachine {
             // let opcode = opcode!(inst);
 
             if log::log_enabled!(log::Level::Debug) {
-                log::debug!(
-                    "{:x}: {:08x} {:?}",
-                    self.pc,
-                    word,
-                    inst
-                );
+                log::debug!("{:x}: {:08x} {:?}", self.pc, word, inst);
             }
 
             inst.execute(self);
@@ -478,6 +473,44 @@ impl VirtualMachine {
                 log::error!("unknown/unimplemented syscall: {}", syscall);
             }
         }
+    }
+}
+
+#[cfg(feature = "rv32m")]
+impl VirtualMachine {
+    /* R-Type */
+    // NB all multiplication extensions are R-Type
+    fn mul(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = ((self.reg[rs1] as i32) * (self.reg[rs2] as i32)) as u32;
+    }
+
+    fn mulh(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = (((self.reg[rs1] as i64) * (self.reg[rs2] as i64)) >> 32) as u32;
+    }
+
+    fn mulhu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = (((self.reg[rs1] as u64) * (self.reg[rs2] as u64)) >> 32) as u32;
+    }
+
+    fn mulhsu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        // NB I don't think this is quite correct, but I'm fuzzy on what is...
+        self.reg[rd] = (((self.reg[rs1] as u64) * (self.reg[rs2] as u64)) >> 32) as u32;
+    }
+
+    fn div(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = ((self.reg[rs1] as i32) / (self.reg[rs2] as i32)) as u32;
+    }
+
+    fn divu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = self.reg[rs1] / self.reg[rs2];
+    }
+
+    fn rem(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = ((self.reg[rs1] as i32) % (self.reg[rs2] as i32)) as u32;
+    }
+
+    fn remu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+        self.reg[rd] = self.reg[rs1] % self.reg[rs2];
     }
 }
 
