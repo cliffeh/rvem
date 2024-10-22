@@ -607,7 +607,7 @@ impl std::fmt::Display for Instruction {
                 if let Some(pc) = f.precision() {
                     write!(f, "j {:x}", (pc as i32 + sext!(*imm, 20) as i32))
                 } else {
-                    write!(f, "jal {:x}", *imm)
+                    write!(f, "jal {}, {:x}", REG_NAMES[*rd], *imm)
                 }
             }
 
