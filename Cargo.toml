@@ -16,3 +16,7 @@ proc-macro2 = "1.0.88"
 prettyplease = "0.2.24"
 quote = "1.0.37"
 syn = "2.0.82"
+
+[features]
+default = ["rv32i"]
+rv32i = []

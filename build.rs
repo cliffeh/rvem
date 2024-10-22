@@ -13,12 +13,6 @@ fn sanitize_name(name: &str) -> String {
     name.replace(".", "_")
 }
 
-struct InstDef {
-    op: Ident,
-    funct3: Option<u32>,
-    funct7: Option<u32>,
-}
-
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let decode_path = Path::new(&out_dir).join("decode.rs");
