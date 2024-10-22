@@ -485,8 +485,9 @@ impl std::fmt::Debug for VirtualMachine {
 }
 
 fn disassemble(pc: usize, inst: u32) -> String {
-    let opcode = opcode!(inst);
-    include!(concat!(env!("OUT_DIR"), "/disasm.rs"))
+    // let opcode = opcode!(inst);
+    // include!(concat!(env!("OUT_DIR"), "/disasm.rs"))
+    "".into()
 }
 
 impl VirtualMachine {

@@ -17,9 +17,9 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let decode_path = Path::new(&out_dir).join("decode.rs");
     let enum_path = Path::new(&out_dir).join("enum.rs");
-    let disasm_path = Path::new(&out_dir).join("disasm.rs");
+    // let disasm_path = Path::new(&out_dir).join("disasm.rs");
 
-    let mut disasm_cases = String::new();
+    // let mut disasm_cases = String::new();
     let mut decode_cases = String::new();
     let mut variants: Vec<TokenStream> = vec![];
 
@@ -67,11 +67,11 @@ fn main() {
                     "{} => Ok(Instruction::{}{{rd: rd!(inst), imm: imm_j!(inst)}}),\n",
                     opcode, opname
                 );
-                disasm_cases += &format!(
-                    "{} => format!(\"{} {{:x}}\", (pc as u32).wrapping_add(sext!(imm_j!(inst), 20))),\n",
-                    pieces[2],
-                    pieces[3].to_lowercase()
-                );
+                // disasm_cases += &format!(
+                //     "{} => format!(\"{} {{:x}}\", (pc as u32).wrapping_add(sext!(imm_j!(inst), 20))),\n",
+                //     pieces[2],
+                //     pieces[3].to_lowercase()
+                // );
             }
             // 0000000 rs2 rs1 000 rd 0110011 ADD
             "0000000" | "0100000" => {
@@ -109,11 +109,11 @@ fn main() {
                     "{} => Ok(Instruction::{}{{rd: rd!(inst), imm: inst >> 12}}),\n",
                     opcode, opname
                 );
-                disasm_cases += &format!(
-                    "{} => format!(\"{} {{}}, 0x{{:x}}\", REG_NAMES[rd!(inst)], inst >> 12),\n",
-                    opcode,
-                    opname.to_lowercase()
-                );
+                // disasm_cases += &format!(
+                //     "{} => format!(\"{} {{}}, 0x{{:x}}\", REG_NAMES[rd!(inst)], inst >> 12),\n",
+                //     opcode,
+                //     opname.to_lowercase()
+                // );
             }
             // TODO is there a way to output build warnings about ignored lines?
             _ => {
@@ -123,35 +123,47 @@ fn main() {
     }
 
     // B-Type
+    let foo = quote!{
+        name => {
+            let funct3 = funct3!(inst);
+            match funct3 {
+
+            }
+        }
+    };
+
+    let opcode_matches: Vec<TokenStream> = vec![];
     for (opcode, subcodes) in btype {
         decode_cases += &format!("{} => {{\n", opcode);
         decode_cases += &format!("let funct3 = funct3!(inst);\n");
         decode_cases += "match funct3 {";
-        disasm_cases += &format!("{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
+        // disasm_cases += &format!("{} => {{\n", opcode);
+        // disasm_cases += &format!("let funct3 = funct3!(inst);\n");
+        // disasm_cases += "match funct3 {";
+        let funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, op) in subcodes {
+            funct3_matches.append(other);
             decode_cases += &format!(
                 "0b{} => Ok(Instruction::{}{{ rs1: rs1!(inst), rs2: rs2!(inst), imm: imm_b!(inst) }}),",
                 funct3, op
             );
-            disasm_cases += &format!(
-                "0b{} => format!(\"{} {{}}, {{}}, {{:x}}\", rs1!(inst), rs2!(inst), pc as u32+sext!(imm_b!(inst), 12)),\n",
-                funct3,
-                op.to_lowercase()
-            );
+            // disasm_cases += &format!(
+            //     "0b{} => format!(\"{} {{}}, {{}}, {{:x}}\", rs1!(inst), rs2!(inst), pc as u32+sext!(imm_b!(inst), 12)),\n",
+            //     funct3,
+            //     op.to_lowercase()
+            // );
         }
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        // disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
+        // disasm_cases += "}},";
         decode_cases += "_ => Err(\"unknown/unimplemented\".to_string())";
         decode_cases += "}},";
     }
 
     // I-Type
     for (opcode, funct3s) in itype {
-        disasm_cases += &format!("{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
+        // disasm_cases += &format!("{} => {{\n", opcode);
+        // disasm_cases += &format!("let funct3 = funct3!(inst);\n");
+        // disasm_cases += "match funct3 {";
         decode_cases += &format!("{} => {{\n", opcode);
         decode_cases += &format!("let funct3 = funct3!(inst);\n");
         decode_cases += "match funct3 {";
@@ -160,18 +172,18 @@ fn main() {
                 "0b{} => Ok(Instruction::{}{{rd: rd!(inst), rs1: rs1!(inst), imm: inst >> 20}}),\n",
                 funct3, op
             );
-            disasm_cases += &format!(
-                "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], sext!(inst >> 20, 12)),",
-                funct3,
-                op.to_lowercase()
-            );
+            // disasm_cases += &format!(
+            //     "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], sext!(inst >> 20, 12)),",
+            //     funct3,
+            //     op.to_lowercase()
+            // );
         }
         // special case for I-Types w/shamt instead of rs2
         if let Some(funct3s) = shamt.get(&opcode) {
             for (funct3, funct7s) in funct3s {
-                disasm_cases += &format!("{} => {{", funct3);
-                disasm_cases += &format!("let funct7 = funct7!(inst);\n");
-                disasm_cases += "match funct7 {";
+                // disasm_cases += &format!("{} => {{", funct3);
+                // disasm_cases += &format!("let funct7 = funct7!(inst);\n");
+                // disasm_cases += "match funct7 {";
                 decode_cases += &format!("{} => {{", funct3);
                 decode_cases += &format!("let funct7 = funct7!(inst);\n");
                 decode_cases += "match funct7 {";
@@ -180,20 +192,20 @@ fn main() {
                         "0b{} => Ok(Instruction::{}{{rd: rd!(inst), rs1: rs1!(inst), shamt: shamt!(inst)}}),\n",
                         funct3, op
                     );
-                    disasm_cases += &format!(
-                        "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], rs2!(inst)),\n",
-                        funct7,
-                        op.to_lowercase()
-                    );
+                    // disasm_cases += &format!(
+                    //     "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], rs2!(inst)),\n",
+                    //     funct7,
+                    //     op.to_lowercase()
+                    // );
                 }
-                disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-                disasm_cases += "}},";
+                // disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
+                // disasm_cases += "}},";
                 decode_cases += "_ => Err(\"unknown/unimplemented\".to_string())";
                 decode_cases += "}},";
             }
         }
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        // disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
+        // disasm_cases += "}},";
         decode_cases += "_ => Err(\"unknown/unimplemented\".to_string())";
         decode_cases += "}},";
     }
@@ -203,60 +215,60 @@ fn main() {
         decode_cases += &format!("{} => {{\n", opcode);
         decode_cases += &format!("let funct3 = funct3!(inst);\n");
         decode_cases += "match funct3 {";
-        disasm_cases += &format!("{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
+        // disasm_cases += &format!("{} => {{\n", opcode);
+        // disasm_cases += &format!("let funct3 = funct3!(inst);\n");
+        // disasm_cases += "match funct3 {";
         for (funct3, funct7s) in funct3s {
             decode_cases += &format!("0b{} => {{", funct3);
             decode_cases += &format!("let funct7 = funct7!(inst);\n");
             decode_cases += "match funct7 {";
-            disasm_cases += &format!("0b{} => {{", funct3);
-            disasm_cases += &format!("let funct7 = funct7!(inst);\n");
-            disasm_cases += "match funct7 {";
+            // disasm_cases += &format!("0b{} => {{", funct3);
+            // disasm_cases += &format!("let funct7 = funct7!(inst);\n");
+            // disasm_cases += "match funct7 {";
             for (funct7, op) in funct7s {
-                disasm_cases += &format!(
-                    "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], REG_NAMES[rs2!(inst)]),\n",
-                    funct7,
-                    op.to_lowercase()
-                );
+                // disasm_cases += &format!(
+                //     "0b{} => format!(\"{} {{}}, {{}}, {{}}\", REG_NAMES[rd!(inst)], REG_NAMES[rs1!(inst)], REG_NAMES[rs2!(inst)]),\n",
+                //     funct7,
+                //     op.to_lowercase()
+                // );
                 decode_cases += &format!(
                     "0b{} => Ok(Instruction::{}{{ rd: rd!(inst), rs1: rs1!(inst), rs2: rs2!(inst)}}),",
                     funct7,
                     op
                 );
             }
-            disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-            disasm_cases += "}},";
+            // disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
+            // disasm_cases += "}},";
             decode_cases += "_ => Err(\"unknown/unimplemented\".to_string())";
             decode_cases += "}},";
         }
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        // disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
+        // disasm_cases += "}},";
         decode_cases += "_ => Err(\"unknown/unimplemented\".to_string())";
         decode_cases += "}},";
     }
 
     // S-Type
     for (opcode, funct3s) in stype {
-        disasm_cases += &format!("0b{} => {{\n", opcode);
-        disasm_cases += &format!("let funct3 = funct3!(inst);\n");
-        disasm_cases += "match funct3 {";
+        // disasm_cases += &format!("0b{} => {{\n", opcode);
+        // disasm_cases += &format!("let funct3 = funct3!(inst);\n");
+        // disasm_cases += "match funct3 {";
         decode_cases += &format!("0b{} => {{\n", opcode);
         decode_cases += &format!("let funct3 = funct3!(inst);\n");
         decode_cases += "match funct3 {";
         for (funct3, op) in funct3s {
-            disasm_cases += &format!(
-                "0b{} => format!(\"{} {{}}, {{}}({{}})\", REG_NAMES[rs2!(inst)], sext!(imm_s!(inst), 12), REG_NAMES[rs1!(inst)]),",
-                funct3,
-                op.to_lowercase()
-            );
+            // disasm_cases += &format!(
+            //     "0b{} => format!(\"{} {{}}, {{}}({{}})\", REG_NAMES[rs2!(inst)], sext!(imm_s!(inst), 12), REG_NAMES[rs1!(inst)]),",
+            //     funct3,
+            //     op.to_lowercase()
+            // );
             decode_cases += &format!(
                 "0b{} => Ok(Instruction::{}{{rs1: rs1!(inst), rs2: rs2!(inst), imm: imm_s!(inst)}}),\n",
                 funct3, op
             );
         }
-        disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
-        disasm_cases += "}},";
+        // disasm_cases += "_ => \"unknown/unimplemented\".to_string()";
+        // disasm_cases += "}},";
         decode_cases += "_ => Err(\"unknown/unimplemented\".to_string())";
         decode_cases += "}},";
     }
@@ -285,13 +297,6 @@ fn main() {
                 }
             }"#;
 
-    let mut names: Vec<Ident> = vec![];
-    let vname = format_ident!("Foo");
-    let foo = quote! {Bar};
-    // names.push(vname);
-    // let mut variants: Vec<proc_macro2::TokenStream> = vec![];
-    // variants.push(quote!{#vname{rd: usize}});
-    // variants.push(quote! {ECALL,});
     let output = quote! {
         #[derive(Debug)]
         pub enum Instruction {
@@ -306,11 +311,11 @@ fn main() {
         format!("{preamble} {decode_cases} {decode_postamble}"),
     )
     .unwrap();
-    fs::write(
-        &disasm_path,
-        format!("{preamble} {disasm_cases} {disasm_postamble}"),
-    )
-    .unwrap();
+    // fs::write(
+    //     &disasm_path,
+    //     format!("{preamble} {disasm_cases} {disasm_postamble}"),
+    // )
+    // .unwrap();
     fs::write(&enum_path, formatted).unwrap();
     println!("cargo::rerun-if-changed=src/lib.rs");
     println!("cargo::rerun-if-changed=src/rv32i.tab");
