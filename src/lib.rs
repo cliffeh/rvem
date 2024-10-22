@@ -145,7 +145,7 @@ impl VirtualMachine {
         }
 
         // TODO find a better place for the stack pointer than "in the middle"...
-        self.reg[R_SP] = (self.mem.len()/2) as u32;
+        self.reg[R_SP] = (self.mem.len() / 2) as u32;
 
         Ok(())
     }
@@ -314,15 +314,6 @@ impl VirtualMachine {
     }
     fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
         let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        log::trace!("LW MEM-4: {:x}: {:02x}", addr-4, self.mem[addr-4]);
-        log::trace!("LW MEM-3: {:x}: {:02x}", addr-3, self.mem[addr-3]);
-        log::trace!("LW MEM-2: {:x}: {:02x}", addr-2, self.mem[addr-2]);
-        log::trace!("LW MEM-1: {:x}: {:02x}", addr-1, self.mem[addr-1]);
-        log::trace!("LW MEM: {:x}: {:02x}", addr, self.mem[addr]);
-        log::trace!("LW MEM+1: {:x}: {:02x}", addr+1, self.mem[addr+1]);
-        log::trace!("LW MEM+2: {:x}: {:02x}", addr+2, self.mem[addr+2]);
-        log::trace!("LW MEM+3: {:x}: {:02x}", addr+3, self.mem[addr+3]);
-        log::trace!("LW MEM+4: {:x}: {:02x}", addr+4, self.mem[addr+4]);
         self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
