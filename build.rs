@@ -34,7 +34,8 @@ fn main() {
         let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
 
         let opname = format_ident!("{}", sanitize_name(pieces[pieces.len() - 1]));
-        let funname = format_ident!("{}", sanitize_name(pieces[pieces.len() - 1]).to_lowercase());
+        let lcname = sanitize_name(pieces[pieces.len() - 1]).to_lowercase();
+        let funname = format_ident!("{}", lcname);
         let opcode = u32::from_str_radix(pieces[pieces.len() - 2], 2).unwrap();
 
         // TODO this will work for now, but could use refinement/refactoring
@@ -248,7 +249,7 @@ fn main() {
         impl Instruction {
             fn execute(&self, vm: &mut VirtualMachine) {
                 match self {
-                    #(#exec_matches,)*
+                    #(#exec_matches),*
                 }
             }
         }
