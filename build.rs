@@ -240,6 +240,7 @@ fn main() {
 
     let enum_output = quote! {
         #[derive(Debug)]
+        #[allow(non_camel_case_types)] // keep the compiler from griping about FENCE_I
         pub enum Instruction {
            #(#variants),*
         }
