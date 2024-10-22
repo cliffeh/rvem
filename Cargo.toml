@@ -20,3 +20,4 @@ syn = "2.0.82"
 [features]
 default = ["rv32i"]
 rv32i = []
+rv32m = ["rv32i"]

@@ -29,103 +29,114 @@ fn main() {
     let mut opcode_matches: Vec<TokenStream> = vec![];
     let mut exec_matches: Vec<TokenStream> = vec![];
 
+    let mut tables: Vec<&str> = vec![];
+
     #[cfg(feature = "rv32i")]
-    for line in read_to_string("src/rv32i.tab").unwrap().lines() {
-        let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
+    tables.push("src/rv32i.tab");
 
-        let opname = format_ident!("{}", sanitize_name(pieces[pieces.len() - 1]));
-        let lcname = sanitize_name(pieces[pieces.len() - 1]).to_lowercase();
-        let funname = format_ident!("{}", lcname);
-        let opcode = u32::from_str_radix(pieces[pieces.len() - 2], 2).unwrap();
+    #[cfg(feature = "rv32m")]
+    tables.push("src/rv32m.tab");
 
-        // TODO this will work for now, but could use refinement/refactoring
-        match pieces[0] {
-            // B-Type: imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
-            "imm[12|10:5]" => {
-                variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
-                exec_matches.push(
+    for filename in tables {
+        for line in read_to_string(filename).unwrap().lines() {
+            let pieces: Vec<&str> = line.split(&[' ', '\t', '\r', '\n']).collect();
+
+            let opname = format_ident!("{}", sanitize_name(pieces[pieces.len() - 1]));
+            let lcname = sanitize_name(pieces[pieces.len() - 1]).to_lowercase();
+            let funname = format_ident!("{}", lcname);
+            let opcode = u32::from_str_radix(pieces[pieces.len() - 2], 2).unwrap();
+
+            // TODO this will work for now, but could use refinement/refactoring
+            match pieces[0] {
+                // B-Type: imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
+                "imm[12|10:5]" => {
+                    variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
+                    exec_matches.push(
                     quote! {Instruction::#opname{rs1, rs2, imm} => vm.#funname(*rs1, *rs2, *imm)},
                 );
 
-                let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
-                let funct3s = btype.entry(opcode).or_default();
-                funct3s.insert(funct3, opname);
-            }
-            // I-Type: imm[11:0] rs1 000 rd 0010011 ADDI
-            "imm[11:0]" => {
-                variants.push(quote! {#opname{rd: usize, rs1: usize, imm: u32}});
-                exec_matches.push(
-                    quote! {Instruction::#opname{rd, rs1, imm} => vm.#funname(*rd, *rs1, *imm)},
-                );
-
-                let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
-                let funct3s = itype.entry(opcode).or_default();
-                funct3s.insert(funct3, opname);
-            }
-            // J-Type: imm[20|10:1|11|19:12] rd 1101111 JAL
-            "imm[20|10:1|11|19:12]" => {
-                variants.push(quote! {#opname{rd: usize,  imm: u32}});
-                exec_matches.push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
-
-                opcode_matches.push(quote! {
-                    #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: imm_j!(inst)})
-                });
-            }
-            // R-Type: 0000000 rs2 rs1 000 rd 0110011 ADD
-            "0000000" | "0100000" => {
-                let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
-                let funct7 = u32::from_str_radix(pieces[0], 2).unwrap();
-                // shamt (special case): 0000000 shamt rs1 001 rd 0010011 SLLI
-                if pieces[1] == "shamt" {
-                    variants.push(quote! {#opname{rd: usize, rs1: usize, shamt: u32}});
-                    exec_matches.push(quote!{Instruction::#opname{rd, rs1, shamt} => vm.#funname(*rd, *rs1, *shamt)});
-
-                    let funct3s = shamt.entry(opcode).or_default();
-                    let funct7s = funct3s.entry(funct3).or_default();
-                    funct7s.insert(funct7, opname);
-                } else {
-                    // 0000000 rs2 rs1 000 rd 0110011 ADD
-                    variants.push(quote! {#opname{rd: usize, rs1: usize, rs2: usize}});
+                    let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                    let funct3s = btype.entry(opcode).or_default();
+                    funct3s.insert(funct3, opname);
+                }
+                // I-Type: imm[11:0] rs1 000 rd 0010011 ADDI
+                "imm[11:0]" => {
+                    variants.push(quote! {#opname{rd: usize, rs1: usize, imm: u32}});
                     exec_matches.push(
+                        quote! {Instruction::#opname{rd, rs1, imm} => vm.#funname(*rd, *rs1, *imm)},
+                    );
+
+                    let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
+                    let funct3s = itype.entry(opcode).or_default();
+                    funct3s.insert(funct3, opname);
+                }
+                // J-Type: imm[20|10:1|11|19:12] rd 1101111 JAL
+                "imm[20|10:1|11|19:12]" => {
+                    variants.push(quote! {#opname{rd: usize,  imm: u32}});
+                    exec_matches
+                        .push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
+
+                    opcode_matches.push(quote! {
+                        #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: imm_j!(inst)})
+                    });
+                }
+                // R-Type: 0000000 rs2 rs1 000 rd 0110011 ADD
+                "0000000" | "0000001" | "0100000" => {
+                    let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                    let funct7 = u32::from_str_radix(pieces[0], 2).unwrap();
+                    // shamt (special case): 0000000 shamt rs1 001 rd 0010011 SLLI
+                    if pieces[1] == "shamt" {
+                        variants.push(quote! {#opname{rd: usize, rs1: usize, shamt: u32}});
+                        exec_matches.push(quote!{Instruction::#opname{rd, rs1, shamt} => vm.#funname(*rd, *rs1, *shamt)});
+
+                        let funct3s = shamt.entry(opcode).or_default();
+                        let funct7s = funct3s.entry(funct3).or_default();
+                        funct7s.insert(funct7, opname);
+                    } else {
+                        // 0000000 rs2 rs1 000 rd 0110011 ADD
+                        variants.push(quote! {#opname{rd: usize, rs1: usize, rs2: usize}});
+                        exec_matches.push(
                         quote! {Instruction::#opname{rd, rs1, rs2} => vm.#funname(*rd, *rs1, *rs2)},
                     );
 
-                    let funct3s = rtype.entry(opcode).or_default();
-                    let funct7s = funct3s.entry(funct3).or_default();
-                    funct7s.insert(funct7, opname);
+                        let funct3s = rtype.entry(opcode).or_default();
+                        let funct7s = funct3s.entry(funct3).or_default();
+                        funct7s.insert(funct7, opname);
+                    }
                 }
-            }
-            // S-Type: imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
-            "imm[11:5]" => {
-                variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
-                exec_matches.push(
+                // S-Type: imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
+                "imm[11:5]" => {
+                    variants.push(quote! {#opname{rs1: usize, rs2: usize, imm: u32}});
+                    exec_matches.push(
                     quote! {Instruction::#opname{rs1, rs2, imm} => vm.#funname(*rs1, *rs2, *imm)},
                 );
 
-                let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
-                let funct3s = stype.entry(opcode).or_default();
-                funct3s.insert(funct3, opname);
-            }
-            // U-Type: imm[31:12] rd 0110111 LUI
-            "imm[31:12]" => {
-                variants.push(quote! {#opname{rd: usize, imm: u32}});
-                exec_matches.push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
+                    let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                    let funct3s = stype.entry(opcode).or_default();
+                    funct3s.insert(funct3, opname);
+                }
+                // U-Type: imm[31:12] rd 0110111 LUI
+                "imm[31:12]" => {
+                    variants.push(quote! {#opname{rd: usize, imm: u32}});
+                    exec_matches
+                        .push(quote! {Instruction::#opname{rd, imm} => vm.#funname(*rd, *imm)});
 
-                opcode_matches.push(quote! {
-                    #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: inst >> 12})
-                });
-            }
-            // TODO is there a way to output build warnings about ignored lines?
-            _ => {
-                variants.push(quote! {#opname});
-                if opname == "ECALL" {
-                    // TODO get rid of this?
                     opcode_matches.push(quote! {
-                        #opcode => Ok(Instruction::ECALL)
+                        #opcode => Ok(Instruction::#opname{rd: rd!(inst), imm: inst >> 12})
                     });
-                    exec_matches.push(quote! {Instruction::ECALL => vm.ecall()});
-                } else {
-                    exec_matches.push(quote! {Instruction::#opname => vm.nop()});
+                }
+                // TODO is there a way to output build warnings about ignored lines?
+                _ => {
+                    variants.push(quote! {#opname});
+                    if opname == "ECALL" {
+                        // TODO get rid of this?
+                        opcode_matches.push(quote! {
+                            #opcode => Ok(Instruction::ECALL)
+                        });
+                        exec_matches.push(quote! {Instruction::ECALL => vm.ecall()});
+                    } else {
+                        exec_matches.push(quote! {Instruction::#opname => vm.nop()});
+                    }
                 }
             }
         }
