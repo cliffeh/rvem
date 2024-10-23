@@ -507,11 +507,7 @@ impl Emulator {
         self[rd] = self[rs1] | sext!(imm12, 12);
     }
     fn slti(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = if self[rs1] < sext!(imm12, 12) {
-            1
-        } else {
-            0
-        };
+        self[rd] = if self[rs1] < sext!(imm12, 12) { 1 } else { 0 };
     }
     fn sltiu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         self[rd] = if (self[rs1] as u32) < (sext!(imm12, 12) as u32) {
