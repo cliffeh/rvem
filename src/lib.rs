@@ -13,11 +13,11 @@ pub mod reg;
 
 use reg::Reg;
 
-/// The default amount of memory to allocate if not specified
+/// Default amount of memory to allocate if not specified
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
-/// The symbol name for the program entrypoint.
+/// Symbol name for the program entrypoint
 const ENTRYPOINT_SYMNAME: &str = "_start";
-/// The symbol name for the global pointer.
+/// Symbol name for the global pointer
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 
 // #[derive(Debug)]
@@ -27,6 +27,11 @@ include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 // }
 
 impl Instruction {
+    /// Extracts the opcode from an instruction.
+    fn opcode(inst: u32) -> u32 {
+        inst & 0b0111_1111
+    }
+
     /// Extracts the destination register bits from an instruction.
     fn rd(inst: u32) -> Reg {
         Reg::from((inst >> 7) & 0b1_1111)
@@ -43,11 +48,18 @@ impl Instruction {
     }
 }
 
-// impl Instruction::execute()
+// impl Instruction {
+//     fn execute(&self, em: &mut Emulator) {
 include!(concat!(env!("OUT_DIR"), "/exec.rs"));
+//     }
+// }
 
-// impl TryFrom<u32> for Instruction
+// impl TryFrom<u32> for Instruction {
+//     type Error = String;
+//     fn try_from(inst: u32) -> Result<Self, Self::Error> {
 include!(concat!(env!("OUT_DIR"), "/decode.rs"));
+//     }
+// }
 
 /// Representation of a RISC-V machine.
 pub struct Emulator {
@@ -593,6 +605,7 @@ impl Emulator {
     }
 }
 
+// TODO implement Diplay for all the rest of the instruction types
 impl std::fmt::Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -644,13 +657,6 @@ impl std::fmt::Display for Instruction {
             }
         }
     }
-}
-
-#[macro_export]
-macro_rules! opcode {
-    ($inst:expr) => {
-        ($inst) & 0b111_1111
-    };
 }
 
 // same position as rs2, but as u32

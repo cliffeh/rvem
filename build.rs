@@ -278,7 +278,7 @@ fn main() {
             type Error = String;
 
             fn try_from(inst: u32) -> Result<Self, Self::Error> {
-                let opcode = opcode!(inst);
+                let opcode = Instruction::opcode(inst);
                 match opcode {
                     #(#opcode_matches,)*
                     _ => Err(format!("unknown/unimplemented opcode: {:07b}", opcode))

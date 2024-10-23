@@ -87,19 +87,19 @@ help: ## show this help
 	@echo "Specify a command. The choices are:"
 	@echo
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[0;36m%-12s\033[m %s\n", $$1, $$2}'
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[0;36m%-22s\033[m %s\n", $$1, $$2}'
 	@echo
 	@echo "Available environment variables:"
 	@echo
-	@printf "  \033[0;36m%-12s\033[m %s\n" RUST_LOG "sets log level (debug, trace, error)"
-	@printf "  \033[0;36m%-12s\033[m %s\n" PROG "sets the program to run"
+	@printf "  \033[0;36m%-22s\033[m %s\n" RUST_LOG "sets log level (debug, trace, error)"
+	@printf "  \033[0;36m%-22s\033[m %s\n" PROG "sets the program to run"
 	@echo
 	@echo "Available programs:"
 	@echo
-	@printf "  \033[0;36m%-12s\033[m %s\n" hello "(default) your bog standard \"Hello, World!\" program"
-	@printf "  \033[0;36m%-12s\033[m %s\n" fac "computes 5!"
-	@printf "  \033[0;36m%-12s\033[m %s\n" fib "computes the Fibonacci sequence up to fib(42)"
-	@printf "  \033[0;36m%-12s\033[m %s\n" strlen "computes the length of \"The quick brown fox jumps over the lazy dog.\""
+	@printf "  \033[0;36m%-22s\033[m %s\n" hello "(default) your bog standard \"Hello, World!\" program"
+	@printf "  \033[0;36m%-22s\033[m %s\n" fac "computes 5!"
+	@printf "  \033[0;36m%-22s\033[m %s\n" fib "computes the Fibonacci sequence up to fib(42)"
+	@printf "  \033[0;36m%-22s\033[m %s\n" strlen "computes the length of \"The quick brown fox jumps over the lazy dog.\""
 	@echo ""
 	@echo "Examples:"
 	@echo
