@@ -48,13 +48,13 @@ impl Inst {
     }
 }
 
-// impl Instruction {
+// impl Inst {
 //     fn execute(&self, em: &mut Emulator) {
 include!(concat!(env!("OUT_DIR"), "/exec.rs"));
 //     }
 // }
 
-// impl TryFrom<u32> for Instruction {
+// impl TryFrom<u32> for Inst {
 //     type Error = String;
 //     fn try_from(inst: u32) -> Result<Self, Self::Error> {
 include!(concat!(env!("OUT_DIR"), "/decode.rs"));
@@ -605,7 +605,6 @@ impl Emulator {
     }
 }
 
-// TODO implement Diplay for all the rest of the instruction types
 impl std::fmt::Display for Inst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -653,6 +652,7 @@ impl std::fmt::Display for Inst {
 
             Inst::ECALL => write!(f, "ecall"),
             _ => {
+                // TODO implement Diplay for all the rest of the instruction types
                 write!(f, "{:?}", self)
             }
         }
