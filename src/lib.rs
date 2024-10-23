@@ -259,7 +259,7 @@ impl Emulator {
                     section.sh_addr,
                     section.sh_size
                 );
-                self.mem[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
+                self[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
                 self.sections.insert(name, section.vm_range());
             }
         }
@@ -420,7 +420,7 @@ impl std::fmt::Debug for Emulator {
                 write!(f, "\n.text:")?;
                 let mut i = range.start;
                 while i < range.end {
-                    let word = u32::from_le_bytes(self.mem[i..i + 4].try_into().unwrap());
+                    let word = u32::from_le_bytes(self[i..i + 4].try_into().unwrap());
                     let inst = Instruction::try_from(word).unwrap();
                     write!(f, "\n  {:x}: {:08x} {:.*}", i, word, i, inst)?;
 
@@ -432,7 +432,7 @@ impl std::fmt::Debug for Emulator {
                     write!(f, "\n{name}")?;
                     let mut i = range.start;
                     while i < range.end {
-                        write!(f, "\n  {:x}: {:02x}", i, self.mem[i])?;
+                        write!(f, "\n  {:x}: {:02x}", i, self[i])?;
                         i += 1;
                     }
                 }
@@ -523,25 +523,25 @@ impl Emulator {
     // loads
     fn lb(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1] + sext!(imm12, 12)) as usize;
-        self[rd] = sext!(self.mem[addr] as u32, 8);
+        self[rd] = sext!(self[addr] as u32, 8);
     }
     fn lh(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1] + sext!(imm12, 12)) as usize;
-        self[rd] = self.mem[addr] as u32;
-        self[rd] |= sext!((self.mem[addr + 1] as u32) << 8, 16);
+        self[rd] = self[addr] as u32;
+        self[rd] |= sext!((self[addr + 1] as u32) << 8, 16);
     }
     fn lw(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1] + sext!(imm12, 12)) as usize;
-        self[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
+        self[rd] = u32::from_le_bytes(self[addr..addr + 4].try_into().unwrap());
     }
     fn lbu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1] + sext!(imm12, 12)) as usize;
-        self[rd] = self.mem[addr] as u32;
+        self[rd] = self[addr] as u32;
     }
     fn lhu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1] + sext!(imm12, 12)) as usize;
-        self[rd] = self.mem[addr] as u32;
-        self[rd] |= (self.mem[addr + 1] as u32) << 8;
+        self[rd] = self[addr] as u32;
+        self[rd] |= (self[addr + 1] as u32) << 8;
     }
 
     // jump
@@ -608,21 +608,21 @@ impl Emulator {
     fn sb(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
         let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         let bytes = self[rs2].to_le_bytes();
-        self.mem[addr] = bytes[0];
+        self[addr] = bytes[0];
     }
     fn sh(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
         let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         let bytes = self[rs2].to_le_bytes();
-        self.mem[addr] = bytes[0];
-        self.mem[addr + 1] = bytes[1];
+        self[addr] = bytes[0];
+        self[addr + 1] = bytes[1];
     }
     fn sw(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
         let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
         let bytes = self[rs2].to_le_bytes();
-        self.mem[addr] = bytes[0];
-        self.mem[addr + 1] = bytes[1];
-        self.mem[addr + 2] = bytes[2];
-        self.mem[addr + 3] = bytes[3];
+        self[addr] = bytes[0];
+        self[addr + 1] = bytes[1];
+        self[addr + 2] = bytes[2];
+        self[addr + 3] = bytes[3];
     }
 
     /* U-Type */
@@ -680,7 +680,7 @@ impl Emulator {
                 let mut fp = unsafe { File::from_raw_fd(self[Reg::a0] as i32) };
                 let addr = self[Reg::a1] as usize;
                 let len = self[Reg::a2] as usize;
-                if let Ok(len) = fp.write(&self.mem[addr..addr + len]) {
+                if let Ok(len) = fp.write(&self[addr..addr + len]) {
                     log::trace!("wrote {} bytes", len);
                     self[Reg::a0] = len as u32;
                 } else {
