@@ -26,7 +26,7 @@ const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 // }
 
-impl Instruction {
+impl Inst {
     /// Extracts the opcode from an instruction.
     fn opcode(inst: u32) -> u32 {
         inst & 0b0111_1111
@@ -185,7 +185,7 @@ impl Emulator {
             }
 
             let word = self.curr();
-            let inst = Instruction::try_from(word).unwrap();
+            let inst = Inst::try_from(word).unwrap();
             // let opcode = opcode!(inst);
 
             // TODO better disassembly
@@ -288,7 +288,7 @@ impl std::fmt::Debug for Emulator {
                 let mut i = range.start;
                 while i < range.end {
                     let word = u32::from_le_bytes(self[i..i + 4].try_into().unwrap());
-                    let inst = Instruction::try_from(word).unwrap();
+                    let inst = Inst::try_from(word).unwrap();
                     write!(f, "\n  {:x}: {:08x} {:.*}", i, word, i, inst)?;
 
                     i += 4;
@@ -606,10 +606,10 @@ impl Emulator {
 }
 
 // TODO implement Diplay for all the rest of the instruction types
-impl std::fmt::Display for Instruction {
+impl std::fmt::Display for Inst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Instruction::ADDI { rd, rs1, imm } => {
+            Inst::ADDI { rd, rs1, imm } => {
                 if *rs1 == Reg::zero {
                     write!(f, "li {}, {}", rd, sext!(*imm, 12) as i32)
                 } else {
@@ -618,19 +618,19 @@ impl std::fmt::Display for Instruction {
                 }
             }
 
-            Instruction::ORI { rd, rs1, imm } => {
+            Inst::ORI { rd, rs1, imm } => {
                 write!(f, "or {}, {}, {}", rd, rs1, sext!(*imm, 12) as i32)
             }
 
-            Instruction::AUIPC { rd, imm } => {
+            Inst::AUIPC { rd, imm } => {
                 write!(f, "auipc {}, 0x{:x}", rd, *imm)
             }
 
-            Instruction::LW { rd, rs1, imm } => {
+            Inst::LW { rd, rs1, imm } => {
                 write!(f, "lw {}, {}({})", rd, sext!(*imm, 12) as i32, rs1)
             }
 
-            Instruction::BEQ { rs1, rs2, imm } => {
+            Inst::BEQ { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
                     format!("{:x}", pc as i32 + sext!(*imm, 12) as i32)
                 } else {
@@ -639,11 +639,11 @@ impl std::fmt::Display for Instruction {
                 write!(f, "beq {}, {}, {addr}", rs1, rs2)
             }
 
-            Instruction::ADD { rd, rs1, rs2 } => {
+            Inst::ADD { rd, rs1, rs2 } => {
                 write!(f, "add {}, {}, {}", rd, rs1, rs2)
             }
 
-            Instruction::JAL { rd, imm } => {
+            Inst::JAL { rd, imm } => {
                 if let Some(pc) = f.precision() {
                     write!(f, "j {:x}", (pc as i32 + sext!(*imm, 20) as i32))
                 } else {
@@ -651,7 +651,7 @@ impl std::fmt::Display for Instruction {
                 }
             }
 
-            Instruction::ECALL => write!(f, "ecall"),
+            Inst::ECALL => write!(f, "ecall"),
             _ => {
                 write!(f, "{:?}", self)
             }

@@ -50,7 +50,7 @@ fn main() {
                 "imm[12|10:5]" => {
                     variants.push(quote! {#opname{rs1: Reg, rs2: Reg, imm: u32}});
                     exec_matches.push(
-                        quote! {Instruction::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
+                        quote! {Inst::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
                     );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
@@ -61,7 +61,7 @@ fn main() {
                 "imm[11:0]" => {
                     variants.push(quote! {#opname{rd: Reg, rs1: Reg, imm: u32}});
                     exec_matches.push(
-                        quote! {Instruction::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)},
+                        quote! {Inst::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)},
                     );
 
                     let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
@@ -72,10 +72,10 @@ fn main() {
                 "imm[20|10:1|11|19:12]" => {
                     variants.push(quote! {#opname{rd: Reg,  imm: u32}});
                     exec_matches
-                        .push(quote! {Instruction::#opname{rd, imm} => em.#funname(*rd, *imm)});
+                        .push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
-                        #opcode => Ok(Instruction::#opname{rd: Instruction::rd(inst), imm: imm_j!(inst)})
+                        #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: imm_j!(inst)})
                     });
                 }
                 // R-Type: 0000000 rs2 rs1 000 rd 0110011 ADD
@@ -85,7 +85,7 @@ fn main() {
                     // shamt (special case): 0000000 shamt rs1 001 rd 0010011 SLLI
                     if pieces[1] == "shamt" {
                         variants.push(quote! {#opname{rd: Reg, rs1: Reg, shamt: u32}});
-                        exec_matches.push(quote!{Instruction::#opname{rd, rs1, shamt} => em.#funname(*rd, *rs1, *shamt)});
+                        exec_matches.push(quote!{Inst::#opname{rd, rs1, shamt} => em.#funname(*rd, *rs1, *shamt)});
 
                         let funct3s = shamt.entry(opcode).or_default();
                         let funct7s = funct3s.entry(funct3).or_default();
@@ -94,7 +94,7 @@ fn main() {
                         // 0000000 rs2 rs1 000 rd 0110011 ADD
                         variants.push(quote! {#opname{rd: Reg, rs1: Reg, rs2: Reg}});
                         exec_matches.push(
-                        quote! {Instruction::#opname{rd, rs1, rs2} => em.#funname(*rd, *rs1, *rs2)},
+                        quote! {Inst::#opname{rd, rs1, rs2} => em.#funname(*rd, *rs1, *rs2)},
                     );
 
                         let funct3s = rtype.entry(opcode).or_default();
@@ -106,7 +106,7 @@ fn main() {
                 "imm[11:5]" => {
                     variants.push(quote! {#opname{rs1: Reg, rs2: Reg, imm: u32}});
                     exec_matches.push(
-                        quote! {Instruction::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
+                        quote! {Inst::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
                     );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
@@ -117,10 +117,10 @@ fn main() {
                 "imm[31:12]" => {
                     variants.push(quote! {#opname{rd: Reg, imm: u32}});
                     exec_matches
-                        .push(quote! {Instruction::#opname{rd, imm} => em.#funname(*rd, *imm)});
+                        .push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
-                        #opcode => Ok(Instruction::#opname{rd: Instruction::rd(inst), imm: inst >> 12})
+                        #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: inst >> 12})
                     });
                 }
                 // TODO is there a way to output build warnings about ignored lines?
@@ -129,11 +129,11 @@ fn main() {
                     if opname == "ECALL" {
                         // TODO get rid of this?
                         opcode_matches.push(quote! {
-                            #opcode => Ok(Instruction::ECALL)
+                            #opcode => Ok(Inst::ECALL)
                         });
-                        exec_matches.push(quote! {Instruction::ECALL => em.ecall()});
+                        exec_matches.push(quote! {Inst::ECALL => em.ecall()});
                     } else {
-                        exec_matches.push(quote! {Instruction::#opname => em.nop()});
+                        exec_matches.push(quote! {Inst::#opname => em.nop()});
                     }
                 }
             }
@@ -145,7 +145,7 @@ fn main() {
         let mut funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, opname) in funct3s {
             funct3_matches.push(quote!{
-                #funct3 => Ok(Instruction::#opname{rs1: Instruction::rs1(inst), rs2: Instruction::rs2(inst), imm: imm_b!(inst)})
+                #funct3 => Ok(Inst::#opname{rs1: Inst::rs1(inst), rs2: Inst::rs2(inst), imm: imm_b!(inst)})
             });
         }
         opcode_matches.push(quote! {
@@ -164,7 +164,7 @@ fn main() {
         let mut funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, opname) in funct3s {
             funct3_matches.push(quote! {
-                #funct3 => Ok(Instruction::#opname{rd: Instruction::rd(inst), rs1: Instruction::rs1(inst), imm: inst >> 20})
+                #funct3 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), imm: inst >> 20})
             });
         }
         opcode_matches.push(quote! {
@@ -185,7 +185,7 @@ fn main() {
             let mut funct7_matches: Vec<TokenStream> = vec![];
             for (funct7, opname) in funct7s {
                 funct7_matches.push(quote!{
-                    #funct7 => Ok(Instruction::#opname{rd: Instruction::rd(inst), rs1: Instruction::rs1(inst), rs2: Instruction::rs2(inst)})
+                    #funct7 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), rs2: Inst::rs2(inst)})
                 });
             }
             funct3_matches.push(quote!{
@@ -204,7 +204,7 @@ fn main() {
                 let mut funct7_matches: Vec<TokenStream> = vec![];
                 for (funct7, opname) in funct7s {
                     funct7_matches.push(quote!{
-                        #funct7 => Ok(Instruction::#opname{rd: Instruction::rd(inst), rs1: Instruction::rs1(inst), shamt: shamt!(inst)})
+                        #funct7 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), shamt: shamt!(inst)})
                     });
                 }
                 funct3_matches.push(quote!{
@@ -234,7 +234,7 @@ fn main() {
         let mut funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, opname) in funct3s {
             funct3_matches.push(quote!{
-                #funct3 => Ok(Instruction::#opname{rs1: Instruction::rs1(inst), rs2: Instruction::rs2(inst), imm: imm_s!(inst)})
+                #funct3 => Ok(Inst::#opname{rs1: Inst::rs1(inst), rs2: Inst::rs2(inst), imm: imm_s!(inst)})
             });
         }
         opcode_matches.push(quote! {
@@ -251,8 +251,8 @@ fn main() {
     let enum_output = quote! {
         #[derive(Debug)]
         #[allow(non_camel_case_types)] // to keep the compiler from griping about FENCE_I
-        /// Enumeration of all known instruction types.
-        pub enum Instruction {
+        /// Enumeration of all known Inst types.
+        pub enum Inst {
             #(#variants,)*
         }
     };
@@ -261,7 +261,7 @@ fn main() {
     fs::write(&enum_path, formatted).unwrap();
 
     let exec_output = quote! {
-        impl Instruction {
+        impl Inst {
             fn execute(&self, em: &mut Emulator) {
                 match self {
                     #(#exec_matches),*
@@ -274,11 +274,11 @@ fn main() {
     fs::write(&exec_path, formatted).unwrap();
 
     let decode_output = quote! {
-        impl TryFrom<u32> for Instruction {
+        impl TryFrom<u32> for Inst {
             type Error = String;
 
             fn try_from(inst: u32) -> Result<Self, Self::Error> {
-                let opcode = Instruction::opcode(inst);
+                let opcode = Inst::opcode(inst);
                 match opcode {
                     #(#opcode_matches,)*
                     _ => Err(format!("unknown/unimplemented opcode: {:07b}", opcode))
