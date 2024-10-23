@@ -6,8 +6,8 @@ use std::ops::{Index, IndexMut, Range};
 use std::os::fd::FromRawFd;
 use std::path::Path;
 use std::process;
-use thiserror::Error;
 use strum::{Display, EnumIter, IntoEnumIterator};
+use thiserror::Error;
 
 /// The default amount of memory to allocate if not specified
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
@@ -15,15 +15,11 @@ pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
 const ENTRYPOINT_SYMNAME: &str = "_start";
 /// The symbol name for the global pointer.
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
-const REG_NAMES: [&str; 32] = [
-    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2",
-    "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
-    "t3", "t4", "t5", "t6",
-];
 
 /// Enumeration of all available registers.
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, Display, EnumIter, PartialEq)]
+#[repr(u32)]
 pub enum Reg {
     /// x0 - hardwired to 0, ignores writes
     zero,
@@ -128,8 +124,72 @@ impl Reg {
     pub const fp: Reg = Reg::s0;
 }
 
-// enum Instruction
+// TODO I feel like there should be a better way than this...
+impl From<u32> for Reg {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => Reg::x0,
+            1 => Reg::x1,
+            2 => Reg::x2,
+            3 => Reg::x3,
+            4 => Reg::x4,
+            5 => Reg::x5,
+            6 => Reg::x6,
+            7 => Reg::x7,
+            8 => Reg::x8,
+            9 => Reg::x9,
+            10 => Reg::x10,
+            11 => Reg::x11,
+            12 => Reg::x12,
+            13 => Reg::x13,
+            14 => Reg::x14,
+            15 => Reg::x15,
+            16 => Reg::x16,
+            17 => Reg::x17,
+            18 => Reg::x18,
+            19 => Reg::x19,
+            20 => Reg::x20,
+            21 => Reg::x21,
+            22 => Reg::x22,
+            23 => Reg::x23,
+            24 => Reg::x24,
+            25 => Reg::x25,
+            26 => Reg::x26,
+            27 => Reg::x27,
+            28 => Reg::x28,
+            29 => Reg::x29,
+            30 => Reg::x30,
+            31 => Reg::x31,
+            _ => unimplemented!("unimplemented register value: {}", value),
+        }
+    }
+}
+
+// #[derive(Debug)]
+// #[allow(non_camel_case_types)] // to keep the compiler from griping about FENCE_I
+// pub enum Instruction {
 include!(concat!(env!("OUT_DIR"), "/enum.rs"));
+// }
+
+impl Instruction {
+    /// Extracts the destination register bits from an instruction.
+    fn rd(inst: u32) -> Reg {
+        Reg::from((inst >> 7) & 0b1_1111)
+    }
+
+    /// Extracts the first argument register bits from an instruction.
+    fn rs1(inst: u32) -> Reg {
+        Reg::from((inst >> 15) & 0b1_1111)
+    }
+
+    /// Extracts the second argument register bits from an instruction.
+    fn rs2(inst: u32) -> Reg {
+        Reg::from((inst >> 20) & 0b1_1111)
+    }
+}
+
+// impl Instruction::execute()
+include!(concat!(env!("OUT_DIR"), "/exec.rs"));
 
 // impl TryFrom<u32> for Instruction
 include!(concat!(env!("OUT_DIR"), "/decode.rs"));
@@ -397,40 +457,39 @@ pub enum EmulatorError {
     ExecutionError(String),
 }
 
-#[cfg(feature = "rv32i")]
 impl Emulator {
     fn nop(&mut self) {
         log::warn!("nop called");
     }
 
     /* B-Type (branches) */
-    fn beq(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] == self.reg[rs2] {
+    fn beq(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+        if self[rs1] == self[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bne(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] != self.reg[rs2] {
+    fn bne(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+        if self[rs1] != self[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn blt(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] < self.reg[rs2] {
+    fn blt(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+        if self[rs1] < self[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bge(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if self.reg[rs1] >= self.reg[rs2] {
+    fn bge(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+        if self[rs1] >= self[rs2] {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bltu(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if (self.reg[rs1] as u32) < (self.reg[rs2] as u32) {
+    fn bltu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+        if (self[rs1] as u32) < (self[rs2] as u32) {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bgeu(&mut self, rs1: usize, rs2: usize, imm13: u32) {
-        if (self.reg[rs1] as u32) >= (self.reg[rs2] as u32) {
+    fn bgeu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+        if (self[rs1] as u32) >= (self[rs2] as u32) {
             self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
@@ -438,132 +497,132 @@ impl Emulator {
     /* I-Type */
 
     // integer operations
-    fn addi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = ((self.reg[rs1] as i32) + (sext!(imm12, 12) as i32)) as u32;
+    fn addi(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        self[rd] = ((self[rs1] as i32) + (sext!(imm12, 12) as i32)) as u32;
     }
-    fn andi(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = self.reg[rs1] & sext!(imm12, 12);
+    fn andi(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        self[rd] = self[rs1] & sext!(imm12, 12);
     }
-    fn ori(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = self.reg[rs1] | sext!(imm12, 12);
+    fn ori(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        self[rd] = self[rs1] | sext!(imm12, 12);
     }
-    fn slti(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = if self.reg[rs1] < sext!(imm12, 12) {
+    fn slti(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        self[rd] = if self[rs1] < sext!(imm12, 12) {
             1
         } else {
             0
         };
     }
-    fn sltiu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = if (self.reg[rs1] as u32) < (sext!(imm12, 12) as u32) {
+    fn sltiu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        self[rd] = if (self[rs1] as u32) < (sext!(imm12, 12) as u32) {
             1
         } else {
             0
         };
     }
-    fn xori(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        self.reg[rd] = self.reg[rs1] ^ sext!(imm12, 12);
+    fn xori(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        self[rd] = self[rs1] ^ sext!(imm12, 12);
     }
 
     // loads
-    fn lb(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = sext!(self.mem[addr] as u32, 8);
+    fn lb(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        self[rd] = sext!(self.mem[addr] as u32, 8);
     }
-    fn lh(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = self.mem[addr] as u32;
-        self.reg[rd] |= sext!((self.mem[addr + 1] as u32) << 8, 16);
+    fn lh(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        self[rd] = self.mem[addr] as u32;
+        self[rd] |= sext!((self.mem[addr + 1] as u32) << 8, 16);
     }
-    fn lw(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
+    fn lw(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        self[rd] = u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap());
     }
-    fn lbu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = self.mem[addr] as u32;
+    fn lbu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        self[rd] = self.mem[addr] as u32;
     }
-    fn lhu(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = (self.reg[rs1] + sext!(imm12, 12)) as usize;
-        self.reg[rd] = self.mem[addr] as u32;
-        self.reg[rd] |= (self.mem[addr + 1] as u32) << 8;
+    fn lhu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        self[rd] = self.mem[addr] as u32;
+        self[rd] |= (self.mem[addr + 1] as u32) << 8;
     }
 
     // jump
-    fn jalr(&mut self, rd: usize, rs1: usize, imm12: u32) {
-        let addr = self.reg[rs1] + sext!(imm12, 12);
-        self.reg[rd] = self.pc as u32 + 4;
+    fn jalr(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
+        let addr = self[rs1] + sext!(imm12, 12);
+        self[rd] = self.pc as u32 + 4;
         self.pc = (addr - 4) as usize; // NB subtract 4 since we're auto-incrementing
     }
 
     /* J-Type */
-    fn jal(&mut self, rd: usize, imm20: u32) {
-        self.reg[rd] = (self.pc + 4) as u32;
+    fn jal(&mut self, rd: Reg, imm20: u32) {
+        self[rd] = (self.pc + 4) as u32;
         let addr = (self.pc as i32 + sext!(imm20, 20) as i32) - 4; // NB subtract 4 since we're auto-incrementing
         self.pc = addr as usize;
     }
 
     /* R-Type */
-    fn add(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] + self.reg[rs2];
+    fn add(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] + self[rs2];
     }
-    fn and(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] & self.reg[rs2];
+    fn and(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] & self[rs2];
     }
-    fn or(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] | self.reg[rs2];
+    fn or(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] | self[rs2];
     }
-    fn sll(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] << self.reg[rs2];
+    fn sll(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] << self[rs2];
     }
-    fn slt(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = if (self.reg[rs1] as i32) < (self.reg[rs2] as i32) {
+    fn slt(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = if (self[rs1] as i32) < (self[rs2] as i32) {
             1
         } else {
             0
         };
     }
-    fn sltu(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = if self.reg[rs1] < self.reg[rs2] { 1 } else { 0 };
+    fn sltu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = if self[rs1] < self[rs2] { 1 } else { 0 };
     }
-    fn sra(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = ((self.reg[rs1] as i32) >> (self.reg[rs2] as i32)) as u32;
+    fn sra(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = ((self[rs1] as i32) >> (self[rs2] as i32)) as u32;
     }
-    fn srl(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] >> self.reg[rs2];
+    fn srl(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] >> self[rs2];
     }
-    fn sub(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] - self.reg[rs2];
+    fn sub(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] - self[rs2];
     }
-    fn xor(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] ^ self.reg[rs2];
+    fn xor(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] ^ self[rs2];
     }
 
-    fn slli(&mut self, rd: usize, rs1: usize, shamt: u32) {
-        self.reg[rd] = self.reg[rs1] << shamt;
+    fn slli(&mut self, rd: Reg, rs1: Reg, shamt: u32) {
+        self[rd] = self[rs1] << shamt;
     }
-    fn srli(&mut self, rd: usize, rs1: usize, shamt: u32) {
-        self.reg[rd] = self.reg[rs1] >> shamt;
+    fn srli(&mut self, rd: Reg, rs1: Reg, shamt: u32) {
+        self[rd] = self[rs1] >> shamt;
     }
-    fn srai(&mut self, rd: usize, rs1: usize, shamt: u32) {
-        self.reg[rd] = ((self.reg[rs1] as i32) >> shamt) as u32;
+    fn srai(&mut self, rd: Reg, rs1: Reg, shamt: u32) {
+        self[rd] = ((self[rs1] as i32) >> shamt) as u32;
     }
 
     /* S-Type */
-    fn sb(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        let bytes = self.reg[rs2].to_le_bytes();
+    fn sb(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
+        let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        let bytes = self[rs2].to_le_bytes();
         self.mem[addr] = bytes[0];
     }
-    fn sh(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        let bytes = self.reg[rs2].to_le_bytes();
+    fn sh(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
+        let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        let bytes = self[rs2].to_le_bytes();
         self.mem[addr] = bytes[0];
         self.mem[addr + 1] = bytes[1];
     }
-    fn sw(&mut self, rs1: usize, rs2: usize, imm12: u32) {
-        let addr = self.reg[rs1].wrapping_add(sext!(imm12, 12)) as usize;
-        let bytes = self.reg[rs2].to_le_bytes();
+    fn sw(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
+        let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        let bytes = self[rs2].to_le_bytes();
         self.mem[addr] = bytes[0];
         self.mem[addr + 1] = bytes[1];
         self.mem[addr + 2] = bytes[2];
@@ -571,12 +630,12 @@ impl Emulator {
     }
 
     /* U-Type */
-    fn auipc(&mut self, rd: usize, imm20: u32) {
-        self.reg[rd] = self.pc as u32 + (imm20 << 12);
+    fn auipc(&mut self, rd: Reg, imm20: u32) {
+        self[rd] = self.pc as u32 + (imm20 << 12);
     }
 
-    fn lui(&mut self, rd: usize, imm20: u32) {
-        self.reg[rd] = imm20 << 12;
+    fn lui(&mut self, rd: Reg, imm20: u32) {
+        self[rd] = imm20 << 12;
     }
 
     /* system calls */
@@ -649,114 +708,85 @@ impl Emulator {
 impl Emulator {
     /* R-Type */
     // NB all multiplication extensions are R-Type
-    fn mul(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = ((self.reg[rs1] as i32) * (self.reg[rs2] as i32)) as u32;
+    fn mul(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = ((self[rs1] as i32) * (self[rs2] as i32)) as u32;
     }
 
-    fn mulh(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = (((self.reg[rs1] as i64) * (self.reg[rs2] as i64)) >> 32) as u32;
+    fn mulh(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = (((self[rs1] as i64) * (self[rs2] as i64)) >> 32) as u32;
     }
 
-    fn mulhu(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = (((self.reg[rs1] as u64) * (self.reg[rs2] as u64)) >> 32) as u32;
+    fn mulhu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = (((self[rs1] as u64) * (self[rs2] as u64)) >> 32) as u32;
     }
 
-    fn mulhsu(&mut self, rd: usize, rs1: usize, rs2: usize) {
+    fn mulhsu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         // NB I don't think this is quite correct, but I'm fuzzy on what is...
-        self.reg[rd] = (((self.reg[rs1] as u64) * (self.reg[rs2] as u64)) >> 32) as u32;
+        self[rd] = (((self[rs1] as u64) * (self[rs2] as u64)) >> 32) as u32;
     }
 
-    fn div(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = ((self.reg[rs1] as i32) / (self.reg[rs2] as i32)) as u32;
+    fn div(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = ((self[rs1] as i32) / (self[rs2] as i32)) as u32;
     }
 
-    fn divu(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] / self.reg[rs2];
+    fn divu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] / self[rs2];
     }
 
-    fn rem(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = ((self.reg[rs1] as i32) % (self.reg[rs2] as i32)) as u32;
+    fn rem(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = ((self[rs1] as i32) % (self[rs2] as i32)) as u32;
     }
 
-    fn remu(&mut self, rd: usize, rs1: usize, rs2: usize) {
-        self.reg[rd] = self.reg[rs1] % self.reg[rs2];
+    fn remu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] % self[rs2];
     }
 }
 
 impl std::fmt::Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            #[cfg(feature = "rv32i")]
             Instruction::ADDI { rd, rs1, imm } => {
-                if *rs1 == 0 {
-                    write!(f, "li {}, {}", REG_NAMES[*rd], sext!(*imm, 12) as i32)
+                if *rs1 == Reg::zero {
+                    write!(f, "li {}, {}", rd, sext!(*imm, 12) as i32)
                 } else {
-                    write!(
-                        f,
-                        "addi {}, {}, {}",
-                        REG_NAMES[*rd],
-                        REG_NAMES[*rs1],
-                        sext!(*imm, 12) as i32
-                    )?;
-
+                    write!(f, "addi {}, {}, {}", rd, rs1, sext!(*imm, 12) as i32)?;
                     Ok(())
                 }
             }
 
-            #[cfg(feature = "rv32i")]
             Instruction::ORI { rd, rs1, imm } => {
-                write!(
-                    f,
-                    "or {}, {}, {}",
-                    REG_NAMES[*rd],
-                    REG_NAMES[*rs1],
-                    sext!(*imm, 12) as i32
-                )
+                write!(f, "or {}, {}, {}", rd, rs1, sext!(*imm, 12) as i32)
             }
 
-            #[cfg(feature = "rv32i")]
             Instruction::AUIPC { rd, imm } => {
-                write!(f, "auipc {}, 0x{:x}", REG_NAMES[*rd], *imm)
+                write!(f, "auipc {}, 0x{:x}", rd, *imm)
             }
-            #[cfg(feature = "rv32i")]
+
             Instruction::LW { rd, rs1, imm } => {
-                write!(
-                    f,
-                    "lw {}, {}({})",
-                    REG_NAMES[*rd],
-                    sext!(*imm, 12) as i32,
-                    REG_NAMES[*rs1]
-                )
+                write!(f, "lw {}, {}({})", rd, sext!(*imm, 12) as i32, rs1)
             }
-            #[cfg(feature = "rv32i")]
+
             Instruction::BEQ { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
                     format!("{:x}", pc as i32 + sext!(*imm, 12) as i32)
                 } else {
                     format!("PC+{}", sext!(*imm, 12) as i32)
                 };
-                write!(f, "beq {}, {}, {addr}", REG_NAMES[*rs1], REG_NAMES[*rs2])
+                write!(f, "beq {}, {}, {addr}", rs1, rs2)
             }
 
-            #[cfg(feature = "rv32i")]
             Instruction::ADD { rd, rs1, rs2 } => {
-                write!(
-                    f,
-                    "add {}, {}, {}",
-                    REG_NAMES[*rd], REG_NAMES[*rs1], REG_NAMES[*rs2]
-                )
+                write!(f, "add {}, {}, {}", rd, rs1, rs2)
             }
 
-            #[cfg(feature = "rv32i")]
             Instruction::JAL { rd, imm } => {
                 if let Some(pc) = f.precision() {
                     write!(f, "j {:x}", (pc as i32 + sext!(*imm, 20) as i32))
                 } else {
-                    write!(f, "jal {}, {:x}", REG_NAMES[*rd], *imm)
+                    write!(f, "jal {}, {:x}", rd, *imm)
                 }
             }
 
-            #[cfg(feature = "rv32i")]
             Instruction::ECALL => write!(f, "ecall"),
             _ => {
                 write!(f, "{:?}", self)
@@ -772,28 +802,7 @@ macro_rules! opcode {
     };
 }
 
-#[macro_export]
-macro_rules! rd {
-    ($inst:expr) => {
-        ((($inst >> 7) & 0b1_1111) as usize)
-    };
-}
-
-#[macro_export]
-macro_rules! rs1 {
-    ($inst:expr) => {
-        ((($inst >> 15) & 0b1_1111) as usize)
-    };
-}
-
-#[macro_export]
-macro_rules! rs2 {
-    ($inst:expr) => {
-        ((($inst >> 20) & 0b1_1111) as usize)
-    };
-}
-
-// same as rs2!, but as u32
+// same position as rs2, but as u32
 #[macro_export]
 macro_rules! shamt {
     ($inst:expr) => {
