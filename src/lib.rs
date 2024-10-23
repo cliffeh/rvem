@@ -2,12 +2,17 @@ use goblin::elf::Elf;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::ops::Range;
+use std::ops::{Index, IndexMut, Range};
 use std::os::fd::FromRawFd;
+use std::path::Path;
 use std::process;
 use thiserror::Error;
 
+/// The default amount of memory to allocate if not specified
+pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
+/// The symbol name for the program entrypoint.
 const ENTRYPOINT_SYMNAME: &str = "_start";
+/// The symbol name for the global pointer.
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 const REG_NAMES: [&str; 32] = [
     "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", /* "fp" */ "s0", "s1", "a0", "a1", "a2",
@@ -15,59 +20,137 @@ const REG_NAMES: [&str; 32] = [
     "t3", "t4", "t5", "t6",
 ];
 
-pub const R_ZERO: usize = 0; /* hardwired to 0, ignores writes    */
-pub const R_RA: usize = 1; /*   return address for jumps          */
-pub const R_SP: usize = 2; /*   stack pointer	                  */
-pub const R_GP: usize = 3; /*   global pointer                    */
-pub const R_TP: usize = 4; /*   thread pointer                    */
-pub const R_T0: usize = 5; /*   temporary register 0              */
-pub const R_T1: usize = 6; /*   temporary register 1              */
-pub const R_T2: usize = 7; /*   temporary register 2              */
-pub const R_FP: usize = 8; /*   saved register 0/frame pointer    */
-pub const R_S0: usize = 8; /*   saved register 0/frame pointer    */
-pub const R_S1: usize = 9; /*   saved register 1                  */
-pub const R_A0: usize = 10; /*  return value/function argument 0  */
-pub const R_A1: usize = 11; /*  return value/function argument 1  */
-pub const R_A2: usize = 12; /*  function argument 2               */
-pub const R_A3: usize = 13; /*  function argument 3               */
-pub const R_A4: usize = 14; /*  function argument 4               */
-pub const R_A5: usize = 15; /*  function argument 5               */
-pub const R_A6: usize = 16; /*  function argument 6               */
-pub const R_A7: usize = 17; /*  function argument 7               */
-pub const R_S2: usize = 18; /*  saved register 2                  */
-pub const R_S3: usize = 19; /*  saved register 3                  */
-pub const R_S4: usize = 20; /*  saved register 4                  */
-pub const R_S5: usize = 21; /*  saved register 5                  */
-pub const R_S6: usize = 22; /*  saved register 6                  */
-pub const R_S7: usize = 23; /*  saved register 7                  */
-pub const R_S8: usize = 24; /*  saved register 8                  */
-pub const R_S9: usize = 25; /*  saved register 9                  */
-pub const R_S10: usize = 26; /* saved register 10                 */
-pub const R_S11: usize = 27; /* saved register 11                 */
-pub const R_T3: usize = 28; /*  temporary register 3              */
-pub const R_T4: usize = 29; /*  temporary register 4              */
-pub const R_T5: usize = 30; /*  temporary register 5              */
-pub const R_T6: usize = 31; /*  temporary register 6              */
+/// Enumeration of all available registers.
+#[repr(usize)]
+#[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq)]
+pub enum Reg {
+    /// x0 - hardwired to 0, ignores writes
+    zero,
+    /// x1 - return address for jumps
+    ra,
+    /// x2 - stack pointer
+    sp,
+    /// x3 = global pointer
+    gp,
+    /// x4 - thread pointer
+    tp,
+    /// x5 - temporary register 0
+    t0,
+    /// x6 - temporary register 1
+    t1,
+    /// x7 - temporary register 2
+    t2,
+    /// x8 - saved register 0 or frame pointer
+    s0,
+    /// x9 - saved register 1
+    s1,
+    /// x10 - return value or function argument 0
+    a0,
+    /// x11 - return value or function argument 1
+    a1,
+    /// x12 - function argument 2
+    a2,
+    /// x13 - function argument 3
+    a3,
+    /// x14 - function argument 4
+    a4,
+    /// x15 - function argument 5
+    a5,
+    /// x16 - function argument 6
+    a6,
+    /// x17 - function argument 7
+    a7,
+    /// x18 - saved register 2
+    s2,
+    /// x19 - saved register 3
+    s3,
+    /// x20 - saved register 4
+    s4,
+    /// x21 - saved register 5
+    s5,
+    /// x22 - saved register 6
+    s6,
+    /// x23 - saved register 7
+    s7,
+    /// x24 - saved register 8
+    s8,
+    /// x25 - saved register 9
+    s9,
+    /// x26 - saved register 10
+    s10,
+    /// x27 - saved register 11
+    s11,
+    /// x28 - temporary register 3
+    t3,
+    /// x29 - temporary register 4
+    t4,
+    /// x30 - temporary register 5
+    t5,
+    /// x31 - temporary register 6
+    t6,
+}
 
-pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
+#[allow(non_upper_case_globals)]
+impl Reg {
+    pub const x0: Reg = Reg::zero;
+    pub const x1: Reg = Reg::ra;
+    pub const x2: Reg = Reg::sp;
+    pub const x3: Reg = Reg::gp;
+    pub const x4: Reg = Reg::tp;
+    pub const x5: Reg = Reg::t0;
+    pub const x6: Reg = Reg::t1;
+    pub const x7: Reg = Reg::t2;
+    pub const x8: Reg = Reg::s0;
+    pub const x9: Reg = Reg::s1;
+    pub const x10: Reg = Reg::a0;
+    pub const x11: Reg = Reg::a1;
+    pub const x12: Reg = Reg::a2;
+    pub const x13: Reg = Reg::a3;
+    pub const x14: Reg = Reg::a4;
+    pub const x15: Reg = Reg::a5;
+    pub const x16: Reg = Reg::a6;
+    pub const x17: Reg = Reg::a7;
+    pub const x18: Reg = Reg::s2;
+    pub const x19: Reg = Reg::s3;
+    pub const x20: Reg = Reg::s4;
+    pub const x21: Reg = Reg::s5;
+    pub const x22: Reg = Reg::s6;
+    pub const x23: Reg = Reg::s7;
+    pub const x24: Reg = Reg::s8;
+    pub const x25: Reg = Reg::s9;
+    pub const x26: Reg = Reg::s10;
+    pub const x27: Reg = Reg::s11;
+    pub const x28: Reg = Reg::t3;
+    pub const x29: Reg = Reg::t4;
+    pub const x30: Reg = Reg::t5;
+    pub const x31: Reg = Reg::t6;
+    pub const fp: Reg = Reg::s0;
+}
 
 // enum Instruction
-// impl Instruction::execute()
-// impl Debug for Instruction
 include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 
 // impl TryFrom<u32> for Instruction
 include!(concat!(env!("OUT_DIR"), "/decode.rs"));
 
+/// Representation of a RISC-V machine.
 pub struct Emulator {
-    pub pc: usize,
-    pub reg: [u32; 32],
-    pub mem: Vec<u8>,
-    pub sections: HashMap<String, Range<usize>>,
-    pub symtab: HashMap<String, usize>,
+    /// Program counter
+    pc: usize,
+    /// Registers
+    reg: [u32; 32],
+    /// Memory
+    mem: Vec<u8>,
+    /// Map of section names to their corresponding memory ranges
+    sections: HashMap<String, Range<usize>>,
+    /// Symbol table
+    symtab: HashMap<String, usize>,
 }
 
 impl Emulator {
+    /// Allocates a new Emulator with `alloc` bytes of memory,
+    /// or [DEFAULT_MEMORY_SIZE] bytes if `None` is provided.
     pub fn new(alloc: Option<usize>) -> Emulator {
         Emulator {
             pc: 0x0,
@@ -85,13 +168,22 @@ impl Emulator {
         }
     }
 
-    pub fn load_from(path: &str, alloc: Option<usize>) -> Result<Emulator, EmulatorError> {
+    /// Loads a RISC-V program from the ELF file at `path` and returns the
+    /// resulting [Emulator], or an [EmulatorError] if an error occurred
+    /// (e.g., the file doesn't exist, isn't formatted correctly, etc.).
+    pub fn load_from<P: AsRef<Path>>(
+        path: P,
+        alloc: Option<usize>,
+    ) -> Result<Emulator, EmulatorError> {
         let mut em = Emulator::new(alloc);
         em.load(path)?;
         Ok(em)
     }
 
-    pub fn load(&mut self, path: &str) -> Result<(), EmulatorError> {
+    /// Loads a RISC-V program from the ELF file at `path` into `self`.
+    /// Returns the unit type, or an [EmulatorError] if an error occurred
+    /// (e.g., the file doesn't exist, isn't formatted correctly, etc.).
+    pub fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<(), EmulatorError> {
         let mut file = File::open(path)?;
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)?;
@@ -118,39 +210,47 @@ impl Emulator {
             }
         }
 
+        Ok(())
+    }
+
+    /// Runs a loaded program, returning the unit type or an [EmulatorError].
+    pub fn run(&mut self) -> Result<(), EmulatorError> {
+        // TODO refactor the initialization code into an init() function?
+        // find the range for our executable code
+        let text_range = self
+            .sections
+            .get(".text")
+            .ok_or_else(|| EmulatorError::ExecutionError("no .text section found".into()))?
+            .clone();
+
+        // set the global pointer address
         if let Some(gp) = self.symtab.get(GLOBAL_POINTER_SYMNAME) {
             log::debug!("global pointer address: 0x{:x}", gp);
-            self.reg[R_GP] = *gp as u32;
+            self[Reg::gp] = *gp as u32;
         } else {
             log::warn!("global pointer address not found");
         }
 
+        // determine where we should start executing code
         if let Some(pc) = self.symtab.get(ENTRYPOINT_SYMNAME) {
             log::debug!("program entrypoint: 0x{:x}", pc);
             self.pc = *pc;
-        } else if let Some(range) = self.sections.get(".text") {
+        } else {
             log::warn!(
                 "program entrypoint {} not found; falling back to beginning of .text section: {:x}",
                 ENTRYPOINT_SYMNAME,
-                range.start
+                text_range.start
             );
-            self.pc = range.start;
-        } else {
-            return Err(EmulatorError::EntryPointError);
+            self.pc = text_range.start;
         }
 
         // TODO find a better place for the stack pointer than "in the middle"...
-        self.reg[R_SP] = ((self.mem.len() / 8) * 4) as u32;
-
-        Ok(())
-    }
-
-    pub fn run(&mut self) -> Result<(), EmulatorError> {
-        let text_range = self.sections.get(".text").unwrap().clone();
+        // NB ensure that the stack pointer is aligned on word boundary
+        self[Reg::sp] = ((self.mem.len() / 8) * 4) as u32;
 
         while text_range.contains(&self.pc) {
             // we'll just reset to zero each iteration rather than blocking writes
-            self.reg[0] = 0;
+            self[Reg::zero] = 0;
 
             if log::log_enabled!(log::Level::Trace) {
                 // dump registers
@@ -180,12 +280,15 @@ impl Emulator {
         }
     }
 
+    /// Returns the current instruction - i.e., the instruction the program
+    /// counter is currently pointing at.
     pub fn curr(&self) -> u32 {
         self.inst(self.pc)
     }
 
+    /// Returns the instruction at memory address `addr`.
     pub fn inst(&self, addr: usize) -> u32 {
-        u32::from_le_bytes(self.mem[addr..addr + 4].try_into().unwrap())
+        u32::from_le_bytes(self[addr..addr + 4].try_into().unwrap())
     }
 }
 
@@ -198,6 +301,48 @@ impl Default for Emulator {
             sections: Default::default(),
             symtab: Default::default(),
         }
+    }
+}
+
+impl Index<Reg> for Emulator {
+    type Output = u32;
+
+    fn index(&self, index: Reg) -> &Self::Output {
+        return &self.reg[index as usize];
+    }
+}
+
+impl IndexMut<Reg> for Emulator {
+    fn index_mut(&mut self, index: Reg) -> &mut Self::Output {
+        return &mut self.reg[index as usize];
+    }
+}
+
+impl Index<usize> for Emulator {
+    type Output = u8;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        return &self.mem[index];
+    }
+}
+
+impl IndexMut<usize> for Emulator {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        return &mut self.mem[index];
+    }
+}
+
+impl Index<Range<usize>> for Emulator {
+    type Output = [u8];
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        return &self.mem[index];
+    }
+}
+
+impl IndexMut<Range<usize>> for Emulator {
+    fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
+        return &mut self.mem[index];
     }
 }
 
@@ -436,24 +581,24 @@ impl Emulator {
 
     /* system calls */
     fn ecall(&mut self) {
-        let syscall = self.reg[R_A7];
+        let syscall = self[Reg::a7];
         match syscall {
             1 => {
                 log::trace!("MIPS print_int"); // https://student.cs.uwaterloo.ca/~isg/res/mips/traps
-                println!("{}", (self.reg[R_A0] as i32));
+                println!("{}", (self[Reg::a0] as i32));
                 std::io::stdout().flush().unwrap();
             }
             4 => {
                 log::trace!("MIPS print_string");
-                let pos = self.reg[R_A0] as usize;
+                let pos = self[Reg::a0] as usize;
                 let mut len = 0usize;
-                while self.mem[pos + len] != 0 {
+                while self[pos + len] != 0 {
                     len += 1;
                 }
 
                 print!(
                     "{}",
-                    String::from_utf8(self.mem[pos..pos + len].into()).unwrap()
+                    String::from_utf8(self[pos..pos + len].into()).unwrap()
                 );
                 std::io::stdout().flush().unwrap();
             }
@@ -462,7 +607,7 @@ impl Emulator {
                 let mut buf: String = String::new();
                 // TODO catch error
                 let _ = std::io::stdin().read_line(&mut buf);
-                self.reg[R_A0] = buf.trim().parse::<u32>().unwrap(); // TODO get rid of unwrap
+                self[Reg::a0] = buf.trim().parse::<u32>().unwrap(); // TODO get rid of unwrap
             }
             10 => {
                 log::trace!("MIPS exit");
@@ -472,26 +617,26 @@ impl Emulator {
                 // RISC-V write
                 log::trace!(
                     "RISC-V linux write syscall: fp: {} addr: {:x} len: {}",
-                    self.reg[R_A0],
-                    self.reg[R_A1],
-                    self.reg[R_A2]
+                    self[Reg::a0],
+                    self[Reg::a1],
+                    self[Reg::a2]
                 );
 
-                let mut fp = unsafe { File::from_raw_fd(self.reg[R_A0] as i32) };
-                let addr = self.reg[R_A1] as usize;
-                let len = self.reg[R_A2] as usize;
+                let mut fp = unsafe { File::from_raw_fd(self[Reg::a0] as i32) };
+                let addr = self[Reg::a1] as usize;
+                let len = self[Reg::a2] as usize;
                 if let Ok(len) = fp.write(&self.mem[addr..addr + len]) {
                     log::trace!("wrote {} bytes", len);
-                    self.reg[R_A0] = len as u32;
+                    self[Reg::a0] = len as u32;
                 } else {
                     log::trace!("write error");
-                    self.reg[R_A0] = 0xffffff; // -1
+                    self[Reg::a0] = -1i32 as u32;
                 }
             }
             93 => {
                 // RISC-V exit
-                log::trace!("RISC-V linux exit syscall: rc: {}", self.reg[R_A0]);
-                process::exit(self.reg[R_A0] as i32);
+                log::trace!("RISC-V linux exit syscall: rc: {}", self[Reg::a0]);
+                process::exit(self[Reg::a0] as i32);
             }
             _ => {
                 log::error!("unknown/unimplemented syscall: {}", syscall);

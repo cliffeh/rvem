@@ -1,4 +1,7 @@
 * DOC COMMENTS
+* refactor to have memory just be a [u32]
+  * seriously, most things reference it that way anyways
+  * referencing memory bytewise is the "special case"
 * refactor to make rvem a subproject (rename repo 'rv'?)
 * cleanup (god there's some awful shit here)
 * test coverage for individual instructions?
@@ -16,3 +19,4 @@
   * ...and it's not that hard/expensive to just work with raw u32s?
 * also dump symbol table in debug info?
   * maybe only if alternate is specified?
+* refactor Reg out into its own module?
