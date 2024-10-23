@@ -7,6 +7,7 @@ use std::os::fd::FromRawFd;
 use std::path::Path;
 use std::process;
 use thiserror::Error;
+use strum::{EnumIter, IntoEnumIterator};
 
 /// The default amount of memory to allocate if not specified
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
@@ -23,7 +24,7 @@ const REG_NAMES: [&str; 32] = [
 /// Enumeration of all available registers.
 #[repr(usize)]
 #[allow(non_camel_case_types)]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, EnumIter, PartialEq)]
 pub enum Reg {
     /// x0 - hardwired to 0, ignores writes
     zero,
@@ -126,6 +127,45 @@ impl Reg {
     pub const x30: Reg = Reg::t5;
     pub const x31: Reg = Reg::t6;
     pub const fp: Reg = Reg::s0;
+}
+
+impl std::fmt::Display for Reg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::zero => write!(f, "zero"),
+            Self::ra => write!(f, "ra"),
+            Self::sp => write!(f, "sp"),
+            Self::gp => write!(f, "gp"),
+            Self::tp => write!(f, "tp"),
+            Self::t0 => write!(f, "t0"),
+            Self::t1 => write!(f, "t1"),
+            Self::t2 => write!(f, "t2"),
+            Self::s0 => write!(f, "s0"),
+            Self::s1 => write!(f, "s1"),
+            Self::a0 => write!(f, "a0"),
+            Self::a1 => write!(f, "a1"),
+            Self::a2 => write!(f, "a2"),
+            Self::a3 => write!(f, "a3"),
+            Self::a4 => write!(f, "a4"),
+            Self::a5 => write!(f, "a5"),
+            Self::a6 => write!(f, "a6"),
+            Self::a7 => write!(f, "a7"),
+            Self::s2 => write!(f, "s2"),
+            Self::s3 => write!(f, "s3"),
+            Self::s4 => write!(f, "s4"),
+            Self::s5 => write!(f, "s5"),
+            Self::s6 => write!(f, "s6"),
+            Self::s7 => write!(f, "s7"),
+            Self::s8 => write!(f, "s8"),
+            Self::s9 => write!(f, "s9"),
+            Self::s10 => write!(f, "s10"),
+            Self::s11 => write!(f, "s11"),
+            Self::t3 => write!(f, "t3"),
+            Self::t4 => write!(f, "t4"),
+            Self::t5 => write!(f, "t5"),
+            Self::t6 => write!(f, "t6"),
+        }
+    }
 }
 
 // enum Instruction
@@ -350,8 +390,8 @@ impl std::fmt::Debug for Emulator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // default behavior: dump PC and registers
         write!(f, "PC: 0x{:x} ", self.pc)?;
-        for i in 0..self.reg.len() {
-            write!(f, " {}: 0x{:x}", REG_NAMES[i], self.reg[i])?;
+        for reg in Reg::iter() {
+            write!(f, " {}: 0x{:x}", reg, self[reg])?;
         }
 
         // alternate behavior: also dump all sections in memory
