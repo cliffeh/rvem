@@ -19,6 +19,7 @@ const ENTRYPOINT_SYMNAME: &str = "_start";
 /// Symbol name for the global pointer
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
 
+/// Sign-extend `$value` from `$bits` to 32 bits
 macro_rules! sext {
     ($value:expr, $bits:expr) => {
         if (($value) & (1 << (($bits) - 1))) == 0 {
