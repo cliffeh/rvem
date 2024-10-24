@@ -15,19 +15,20 @@ use reg::Reg;
 /// Default amount of memory to allocate if not specified
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
 /// Symbol name for the program entrypoint
-const ENTRYPOINT_SYMNAME: &str = "_start";
+const ENTRYPOINT_SYM: &str = "_start";
 /// Symbol name for the global pointer
-const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
+const GLOBAL_POINTER_SYM: &str = "__global_pointer$";
+/// Symbol names for the start/end of the BSS region
+const BSS_START_SYM: &str = "__bss_start";
+const BSS_END_SYM: &str = "__BSS_END__";
 
 /// Sign-extend `$value` from `$bits` to 32 bits
-macro_rules! sext {
-    ($value:expr, $bits:expr) => {
-        if (($value) & (1 << (($bits) - 1))) == 0 {
-            $value
-        } else {
-            (($value) | (0xffffffff << ($bits)))
-        }
-    };
+pub(crate) fn sext(value: u32, bits: usize) -> u32 {
+    if ((value) & (1 << ((bits) - 1))) == 0 {
+        value
+    } else {
+        (value) | (0xffffffff << (bits))
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/enum.rs")); // enum Inst
@@ -152,6 +153,7 @@ impl Emulator {
 
         let elf = Elf::parse(&buf)?;
 
+        // load allocatable sections
         for section in &elf.section_headers {
             if section.is_alloc() {
                 let name = elf.shdr_strtab.get_at(section.sh_name).unwrap().to_string();
@@ -166,9 +168,21 @@ impl Emulator {
             }
         }
 
+        // load the symbol table
         for sym in elf.syms.iter() {
             if let Some(name) = elf.strtab.get_at(sym.st_name) {
-                self.symtab.insert(name.into(), sym.st_value as usize);
+                if name.len() > 0 {
+                    self.symtab.insert(name.into(), sym.st_value as usize);
+                }
+            }
+        }
+
+        // zero the Block Started by Symbol (BSS) region
+        if let Some(bss_start) = self.symtab.get(BSS_START_SYM) {
+            if let Some(bss_end) = self.symtab.get(BSS_END_SYM) {
+                for i in *bss_start..*bss_end {
+                    self[i] = 0u8;
+                }
             }
         }
 
@@ -186,7 +200,7 @@ impl Emulator {
             .clone();
 
         // set the global pointer address
-        if let Some(gp) = self.symtab.get(GLOBAL_POINTER_SYMNAME) {
+        if let Some(gp) = self.symtab.get(GLOBAL_POINTER_SYM) {
             log::debug!("global pointer address: 0x{:x}", gp);
             self[Reg::gp] = *gp as u32;
         } else {
@@ -194,21 +208,20 @@ impl Emulator {
         }
 
         // determine where we should start executing code
-        if let Some(pc) = self.symtab.get(ENTRYPOINT_SYMNAME) {
+        if let Some(pc) = self.symtab.get(ENTRYPOINT_SYM) {
             log::debug!("program entrypoint: 0x{:x}", pc);
             self.pc = *pc;
         } else {
             log::warn!(
                 "program entrypoint {} not found; falling back to beginning of .text section: {:x}",
-                ENTRYPOINT_SYMNAME,
+                ENTRYPOINT_SYM,
                 text_range.start
             );
             self.pc = text_range.start;
         }
 
-        // TODO find a better place for the stack pointer than "in the middle"...
-        // NB ensure that the stack pointer is aligned on word boundary
-        self[Reg::sp] = ((self.mem.len() / 8) * 4) as u32;
+        // we'll give them the rest of the memory for the stack
+        self[Reg::sp] = self.mem.len() as u32;
 
         while text_range.contains(&self.pc) {
             if log::log_enabled!(log::Level::Trace) {
@@ -344,6 +357,12 @@ impl std::fmt::Debug for Emulator {
                     }
                 }
             }
+            write!(f, "\nSymbols:")?;
+            let mut sorted: Vec<(&String, &usize)> = self.symtab.iter().collect();
+            sorted.sort_by(|a, b| a.1.cmp(b.1));
+            for (sym, addr) in sorted {
+                write!(f, "\n  {:08x}: {}", addr, sym)?;
+            }
         }
         Ok(())
     }
@@ -376,32 +395,32 @@ impl Emulator {
     /* B-Type (branches) */
     fn beq(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if self[rs1] == self[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bne(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if self[rs1] != self[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn blt(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if self[rs1] < self[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bge(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if self[rs1] >= self[rs2] {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bltu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if (self[rs1] as u32) < (self[rs2] as u32) {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bgeu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if (self[rs1] as u32) >= (self[rs2] as u32) {
-            self.pc += (sext!(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
 
@@ -409,55 +428,55 @@ impl Emulator {
 
     // integer operations
     fn addi(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = ((self[rs1] as i32) + (sext!(imm12, 12) as i32)) as u32;
+        self[rd] = ((self[rs1] as i32) + (sext(imm12, 12) as i32)) as u32;
     }
     fn andi(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = self[rs1] & sext!(imm12, 12);
+        self[rd] = self[rs1] & sext(imm12, 12);
     }
     fn ori(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = self[rs1] | sext!(imm12, 12);
+        self[rd] = self[rs1] | sext(imm12, 12);
     }
     fn slti(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = if self[rs1] < sext!(imm12, 12) { 1 } else { 0 };
+        self[rd] = if self[rs1] < sext(imm12, 12) { 1 } else { 0 };
     }
     fn sltiu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = if (self[rs1] as u32) < (sext!(imm12, 12) as u32) {
+        self[rd] = if (self[rs1] as u32) < (sext(imm12, 12) as u32) {
             1
         } else {
             0
         };
     }
     fn xori(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = self[rs1] ^ sext!(imm12, 12);
+        self[rd] = self[rs1] ^ sext(imm12, 12);
     }
 
     // loads
     fn lb(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
-        self[rd] = sext!(self[addr] as u32, 8);
+        let addr = (self[rs1] + sext(imm12, 12)) as usize;
+        self[rd] = sext(self[addr] as u32, 8);
     }
     fn lh(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        let addr = (self[rs1] + sext(imm12, 12)) as usize;
         self[rd] = self[addr] as u32;
-        self[rd] |= sext!((self[addr + 1] as u32) << 8, 16);
+        self[rd] |= sext((self[addr + 1] as u32) << 8, 16);
     }
     fn lw(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        let addr = (self[rs1] + sext(imm12, 12)) as usize;
         self[rd] = *bytemuck::from_bytes(&self[addr..addr + 4]);
     }
     fn lbu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        let addr = (self[rs1] + sext(imm12, 12)) as usize;
         self[rd] = self[addr] as u32;
     }
     fn lhu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext!(imm12, 12)) as usize;
+        let addr = (self[rs1] + sext(imm12, 12)) as usize;
         self[rd] = self[addr] as u32;
         self[rd] |= (self[addr + 1] as u32) << 8;
     }
 
     // jump
     fn jalr(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = self[rs1] + sext!(imm12, 12);
+        let addr = self[rs1] + sext(imm12, 12);
         self[rd] = self.pc as u32 + 4;
         self.pc = (addr - 4) as usize; // NB subtract 4 since we're auto-incrementing
     }
@@ -465,7 +484,7 @@ impl Emulator {
     /* J-Type */
     fn jal(&mut self, rd: Reg, imm20: u32) {
         self[rd] = (self.pc + 4) as u32;
-        let addr = (self.pc as i32 + sext!(imm20, 20) as i32) - 4; // NB subtract 4 since we're auto-incrementing
+        let addr = (self.pc as i32 + sext(imm20, 20) as i32) - 4; // NB subtract 4 since we're auto-incrementing
         self.pc = addr as usize;
     }
 
@@ -517,18 +536,18 @@ impl Emulator {
 
     /* S-Type */
     fn sb(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
-        let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        let addr = self[rs1].wrapping_add(sext(imm12, 12)) as usize;
         let bytes = self[rs2].to_le_bytes();
         self[addr] = bytes[0];
     }
     fn sh(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
-        let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        let addr = self[rs1].wrapping_add(sext(imm12, 12)) as usize;
         let bytes = self[rs2].to_le_bytes();
         self[addr] = bytes[0];
         self[addr + 1] = bytes[1];
     }
     fn sw(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
-        let addr = self[rs1].wrapping_add(sext!(imm12, 12)) as usize;
+        let addr = self[rs1].wrapping_add(sext(imm12, 12)) as usize;
         let bytes = self[rs2].to_le_bytes();
         self[addr] = bytes[0];
         self[addr + 1] = bytes[1];
@@ -654,15 +673,15 @@ impl std::fmt::Display for Inst {
         match self {
             Inst::ADDI { rd, rs1, imm } => {
                 if *rs1 == Reg::zero {
-                    write!(f, "li {}, {}", rd, sext!(*imm, 12) as i32)
+                    write!(f, "li {}, {}", rd, sext(*imm, 12) as i32)
                 } else {
-                    write!(f, "addi {}, {}, {}", rd, rs1, sext!(*imm, 12) as i32)?;
+                    write!(f, "addi {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)?;
                     Ok(())
                 }
             }
 
             Inst::ORI { rd, rs1, imm } => {
-                write!(f, "or {}, {}, {}", rd, rs1, sext!(*imm, 12) as i32)
+                write!(f, "or {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
             }
 
             Inst::AUIPC { rd, imm } => {
@@ -670,14 +689,14 @@ impl std::fmt::Display for Inst {
             }
 
             Inst::LW { rd, rs1, imm } => {
-                write!(f, "lw {}, {}({})", rd, sext!(*imm, 12) as i32, rs1)
+                write!(f, "lw {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
             }
 
             Inst::BEQ { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
-                    format!("{:x}", pc as i32 + sext!(*imm, 12) as i32)
+                    format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
                 } else {
-                    format!("PC+{}", sext!(*imm, 12) as i32)
+                    format!("PC+{}", sext(*imm, 12) as i32)
                 };
                 write!(f, "beq {}, {}, {addr}", rs1, rs2)
             }
@@ -688,7 +707,7 @@ impl std::fmt::Display for Inst {
 
             Inst::JAL { rd, imm } => {
                 if let Some(pc) = f.precision() {
-                    write!(f, "j {:x}", (pc as i32 + sext!(*imm, 20) as i32))
+                    write!(f, "j {:x}", (pc as i32 + sext(*imm, 20) as i32))
                 } else {
                     write!(f, "jal {}, {:x}", rd, *imm)
                 }

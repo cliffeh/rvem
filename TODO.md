@@ -12,5 +12,3 @@
 * I'm not sure I'm actually "happy" with the generated Instruction enum?
   * it feels "rust-y"...but it's also clunky
   * ...and it's not that hard/expensive to just work with raw u32s?
-* also dump symbol table in debug info?
-  * maybe only if alternate is specified?
