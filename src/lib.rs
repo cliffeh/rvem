@@ -24,13 +24,9 @@ const GLOBAL_POINTER_SYM: &str = "__global_pointer$";
 const BSS_START_SYM: &str = "__bss_start";
 const BSS_END_SYM: &str = "__BSS_END__";
 
-/// Sign-extend `$value` from `$bits` to 32 bits
+/// Sign-extend `$value` from `$bits` to 32 bits.
 pub(crate) fn sext(value: u32, bits: usize) -> u32 {
-    if ((value) & (1 << ((bits) - 1))) == 0 {
-        value
-    } else {
-        (value) | (0xffffffff << (bits))
-    }
+    ((value << (32 - bits)) as i32 >> (32 - bits)) as u32
 }
 
 /// Representation of a RISC-V machine.
@@ -605,5 +601,20 @@ impl Emulator {
 
     fn remu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = self[rs1] % self[rs2];
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Works
+    #[test]
+    fn test_sext() {
+        let value = 0xff0u32;
+        assert_eq!(sext(value, 12), 0xfffffff0);
+
+        let value = 0x7f0u32;
+        assert_eq!(sext(value, 12), value);
     }
 }
