@@ -150,7 +150,7 @@ fn main() {
                 let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
-                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
+                    _ => { Err(EmulatorError::InstructionDecode(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))) }
                 }
             }
         })
@@ -178,7 +178,7 @@ fn main() {
                         let funct7 = Inst::funct7(inst);
                         match funct7 {
                             #(#funct7_matches,)*
-                            _ => { Err(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))}
+                            _ => { Err(EmulatorError::InstructionDecode(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))) }
                         }
                     }
                 });
@@ -189,7 +189,7 @@ fn main() {
                 let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
-                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
+                    _ => { Err(EmulatorError::InstructionDecode(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))) }
                 }
             }
         });
@@ -210,7 +210,7 @@ fn main() {
                     let funct7 = Inst::funct7(inst);
                     match funct7 {
                         #(#funct7_matches,)*
-                        _ => { Err(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))}
+                        _ => { Err(EmulatorError::InstructionDecode(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))) }
                     }
                 }
             });
@@ -221,7 +221,7 @@ fn main() {
                 let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
-                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
+                    _ => { Err(EmulatorError::InstructionDecode(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))) }
                 }
             }
         });
@@ -240,7 +240,7 @@ fn main() {
                 let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
-                    _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
+                    _ => { Err(EmulatorError::InstructionDecode(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))) }
                 }
             }
         })
@@ -273,13 +273,13 @@ fn main() {
 
     let decode_output = quote! {
         impl TryFrom<u32> for Inst {
-            type Error = String;
+            type Error = EmulatorError;
 
             fn try_from(inst: u32) -> Result<Self, Self::Error> {
                 let opcode = Inst::opcode(inst);
                 match opcode {
                     #(#opcode_matches,)*
-                    _ => Err(format!("unknown/unimplemented opcode: {:07b}", opcode))
+                    _ => Err(EmulatorError::InstructionDecode(format!("unknown/unimplemented opcode: {:07b}", opcode)))
                 }
             }
         }

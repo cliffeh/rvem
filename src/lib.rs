@@ -182,7 +182,7 @@ impl Emulator {
         let text_range = self
             .sections
             .get(".text")
-            .ok_or_else(|| EmulatorError::ExecutionError("no .text section found".into()))?
+            .ok_or_else(|| EmulatorError::Execution("no .text section found".into()))?
             .clone();
 
         // set the global pointer address
@@ -217,7 +217,7 @@ impl Emulator {
             }
 
             let word = self.curr();
-            let inst = Inst::try_from(word).unwrap();
+            let inst = Inst::try_from(word)?;
 
             if log::log_enabled!(log::Level::Debug) {
                 log::debug!("{:x}: {:08x} {:.*}", self.pc, word, self.pc, inst);
@@ -231,7 +231,7 @@ impl Emulator {
         if text_range.contains(&self.pc) {
             Ok(())
         } else {
-            Err(EmulatorError::ExecutionError(
+            Err(EmulatorError::Execution(
                 "program counter outside bounds of .text section".into(),
             ))
         }
@@ -353,16 +353,19 @@ impl std::fmt::Debug for Emulator {
 #[derive(Error, Debug)]
 pub enum EmulatorError {
     #[error("{0}")]
-    IOError(#[from] io::Error),
+    IO(#[from] io::Error),
 
     #[error("error parsing ELF data: {0}")]
-    ElfError(#[from] goblin::error::Error),
+    ELF(#[from] goblin::error::Error),
 
     #[error("program entrypoint could not be located")]
-    EntryPointError,
+    EntryPoint,
+
+    #[error("instruction could not be decoded: {0}")]
+    InstructionDecode(String),
 
     #[error("execution error: {0}")]
-    ExecutionError(String),
+    Execution(String),
 }
 
 impl Emulator {
