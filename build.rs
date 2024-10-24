@@ -60,9 +60,8 @@ fn main() {
                 // I-Type: imm[11:0] rs1 000 rd 0010011 ADDI
                 "imm[11:0]" => {
                     variants.push(quote! {#opname{rd: Reg, rs1: Reg, imm: u32}});
-                    exec_matches.push(
-                        quote! {Inst::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)},
-                    );
+                    exec_matches
+                        .push(quote! {Inst::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)});
 
                     let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
                     let funct3s = itype.entry(opcode).or_default();
@@ -71,11 +70,10 @@ fn main() {
                 // J-Type: imm[20|10:1|11|19:12] rd 1101111 JAL
                 "imm[20|10:1|11|19:12]" => {
                     variants.push(quote! {#opname{rd: Reg,  imm: u32}});
-                    exec_matches
-                        .push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
+                    exec_matches.push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
-                        #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: imm_j!(inst)})
+                        #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: Inst::imm_j(inst)})
                     });
                 }
                 // R-Type: 0000000 rs2 rs1 000 rd 0110011 ADD
@@ -94,8 +92,8 @@ fn main() {
                         // 0000000 rs2 rs1 000 rd 0110011 ADD
                         variants.push(quote! {#opname{rd: Reg, rs1: Reg, rs2: Reg}});
                         exec_matches.push(
-                        quote! {Inst::#opname{rd, rs1, rs2} => em.#funname(*rd, *rs1, *rs2)},
-                    );
+                            quote! {Inst::#opname{rd, rs1, rs2} => em.#funname(*rd, *rs1, *rs2)},
+                        );
 
                         let funct3s = rtype.entry(opcode).or_default();
                         let funct7s = funct3s.entry(funct3).or_default();
@@ -116,8 +114,7 @@ fn main() {
                 // U-Type: imm[31:12] rd 0110111 LUI
                 "imm[31:12]" => {
                     variants.push(quote! {#opname{rd: Reg, imm: u32}});
-                    exec_matches
-                        .push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
+                    exec_matches.push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
                         #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: inst >> 12})
@@ -145,7 +142,7 @@ fn main() {
         let mut funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, opname) in funct3s {
             funct3_matches.push(quote!{
-                #funct3 => Ok(Inst::#opname{rs1: Inst::rs1(inst), rs2: Inst::rs2(inst), imm: imm_b!(inst)})
+                #funct3 => Ok(Inst::#opname{rs1: Inst::rs1(inst), rs2: Inst::rs2(inst), imm: Inst::imm_b(inst)})
             });
         }
         opcode_matches.push(quote! {
@@ -218,7 +215,7 @@ fn main() {
                 }
             });
         }
-        
+
         opcode_matches.push(quote! {
             #opcode => {
                 let funct3 = Inst::funct3(inst);
@@ -235,7 +232,7 @@ fn main() {
         let mut funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, opname) in funct3s {
             funct3_matches.push(quote!{
-                #funct3 => Ok(Inst::#opname{rs1: Inst::rs1(inst), rs2: Inst::rs2(inst), imm: imm_s!(inst)})
+                #funct3 => Ok(Inst::#opname{rs1: Inst::rs1(inst), rs2: Inst::rs2(inst), imm: Inst::imm_s(inst)})
             });
         }
         opcode_matches.push(quote! {
@@ -252,7 +249,7 @@ fn main() {
     let enum_output = quote! {
         #[derive(Debug)]
         #[allow(non_camel_case_types)] // to keep the compiler from griping about FENCE_I
-        /// Enumeration of all known Inst types.
+        /// Enumeration of all known instruction types.
         pub enum Inst {
             #(#variants,)*
         }

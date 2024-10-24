@@ -9,8 +9,7 @@ use std::process;
 use strum::IntoEnumIterator;
 use thiserror::Error;
 
-pub mod reg;
-
+mod reg;
 use reg::Reg;
 
 /// Default amount of memory to allocate if not specified
@@ -19,6 +18,16 @@ pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
 const ENTRYPOINT_SYMNAME: &str = "_start";
 /// Symbol name for the global pointer
 const GLOBAL_POINTER_SYMNAME: &str = "__global_pointer$";
+
+macro_rules! sext {
+    ($value:expr, $bits:expr) => {
+        if (($value) & (1 << (($bits) - 1))) == 0 {
+            $value
+        } else {
+            (($value) | (0xffffffff << ($bits)))
+        }
+    };
+}
 
 // #[derive(Debug)]
 // #[allow(non_camel_case_types)] // to keep the compiler from griping about FENCE_I
@@ -52,14 +61,35 @@ impl Inst {
         (inst >> 20) & 0b1_1111
     }
 
-    /// Extracts funct3 buts from an instruction (inst[14:12])
+    /// Extracts funct3 buts from an instruction (inst[14:12]).
     fn funct3(inst: u32) -> u32 {
         (inst >> 12) & 0b111
     }
 
-    /// Extracts funct7 buts from an instruction (inst[31:25])
+    /// Extracts funct7 buts from an instruction (inst[31:25]).
     fn funct7(inst: u32) -> u32 {
         inst >> 25
+    }
+
+    /// Extracts immediate value for a B-Type instruction.
+    fn imm_b(inst: u32) -> u32 {
+        ((((inst) >> 31) & 0x1) << 12)
+            | ((((inst) >> 7) & 0b1) << 11)
+            | ((((inst) >> 25) & 0b111111) << 5)
+            | ((((inst) >> 8) & 0b1111) << 1)
+    }
+
+    /// Extracts immediate value for a J-Type instruction.
+    fn imm_j(inst: u32) -> u32 {
+        ((((inst) >> 31) & 0b1) << 20)
+            | ((((inst) >> 12) & 0b11111111) << 12)
+            | ((((inst) >> 20) & 0b1) << 11)
+            | ((((inst) >> 21) & 0b1111111111) << 1)
+    }
+
+    /// Extracts immediate value for an S-Type instruction.
+    fn imm_s(inst: u32) -> u32 {
+        (((inst) >> 25) << 7) | (((inst) >> 7) & 0b11111)
     }
 }
 
@@ -672,42 +702,4 @@ impl std::fmt::Display for Inst {
             }
         }
     }
-}
-
-#[macro_export]
-macro_rules! imm_b {
-    ($inst:expr) => {
-        ((((($inst) >> 31) & 0x1) << 12)
-            | (((($inst) >> 7) & 0b1) << 11)
-            | (((($inst) >> 25) & 0b111111) << 5)
-            | (((($inst) >> 8) & 0b1111) << 1))
-    };
-}
-
-#[macro_export]
-macro_rules! imm_j {
-    ($inst:expr) => {
-        ((((($inst) >> 31) & 0b1) << 20)
-            | (((($inst) >> 12) & 0b11111111) << 12)
-            | (((($inst) >> 20) & 0b1) << 11)
-            | (((($inst) >> 21) & 0b1111111111) << 1))
-    };
-}
-
-#[macro_export]
-macro_rules! imm_s {
-    ($inst:expr) => {
-        (((($inst) >> 25) << 7) | ((($inst) >> 7) & 0b11111))
-    };
-}
-
-#[macro_export]
-macro_rules! sext {
-    ($value:expr, $bits:expr) => {
-        if (($value) & (1 << (($bits) - 1))) == 0 {
-            $value
-        } else {
-            (($value) | (0xffffffff << ($bits)))
-        }
-    };
 }
