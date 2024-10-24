@@ -18,10 +18,6 @@ struct Args {
     #[arg(short, long, default_value_t = DEFAULT_MEMORY_SIZE)]
     memory: usize,
 
-    /// Initialize the stack pointer [default: beginning of .text section]
-    #[arg(long)]
-    sp: Option<usize>,
-
     /// RISC-V program to emulate
     file: String,
 }
