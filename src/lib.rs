@@ -29,11 +29,8 @@ macro_rules! sext {
     };
 }
 
-// #[derive(Debug)]
-// #[allow(non_camel_case_types)] // to keep the compiler from griping about FENCE_I
-// pub enum Instruction {
-include!(concat!(env!("OUT_DIR"), "/enum.rs"));
-// }
+include!(concat!(env!("OUT_DIR"), "/enum.rs")); // enum Inst
+include!(concat!(env!("OUT_DIR"), "/exec.rs")); // Inst::execute()
 
 impl Inst {
     /// Extracts the opcode from an instruction (inst[6:0]).
@@ -93,18 +90,7 @@ impl Inst {
     }
 }
 
-// impl Inst {
-//     fn execute(&self, em: &mut Emulator) {
-include!(concat!(env!("OUT_DIR"), "/exec.rs"));
-//     }
-// }
-
-// impl TryFrom<u32> for Inst {
-//     type Error = String;
-//     fn try_from(inst: u32) -> Result<Self, Self::Error> {
-include!(concat!(env!("OUT_DIR"), "/decode.rs"));
-//     }
-// }
+include!(concat!(env!("OUT_DIR"), "/decode.rs")); // impl TryFrom<u32> for Inst
 
 /// Representation of a RISC-V machine.
 pub struct Emulator {
@@ -354,6 +340,7 @@ impl std::fmt::Debug for Emulator {
     }
 }
 
+/// Errors encountered while loading or emulating a program.
 #[derive(Error, Debug)]
 pub enum EmulatorError {
     #[error("{0}")]
