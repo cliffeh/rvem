@@ -27,24 +27,39 @@ include!(concat!(env!("OUT_DIR"), "/enum.rs"));
 // }
 
 impl Inst {
-    /// Extracts the opcode from an instruction.
+    /// Extracts the opcode from an instruction (inst[6:0]).
     fn opcode(inst: u32) -> u32 {
         inst & 0b0111_1111
     }
 
-    /// Extracts the destination register bits from an instruction.
+    /// Extracts the destination register bits from an instruction (inst[11:7]).
     fn rd(inst: u32) -> Reg {
         Reg::from((inst >> 7) & 0b1_1111)
     }
 
-    /// Extracts the first argument register bits from an instruction.
+    /// Extracts the first argument register bits from an instruction (inst[19:15]).
     fn rs1(inst: u32) -> Reg {
         Reg::from((inst >> 15) & 0b1_1111)
     }
 
-    /// Extracts the second argument register bits from an instruction.
+    /// Extracts the second argument register bits from an instruction (inst[24:20]).
     fn rs2(inst: u32) -> Reg {
         Reg::from((inst >> 20) & 0b1_1111)
+    }
+
+    /// Extracts shift amount bits from an instruction (inst[24:20]).
+    fn shamt(inst: u32) -> u32 {
+        (inst >> 20) & 0b1_1111
+    }
+
+    /// Extracts funct3 buts from an instruction (inst[14:12])
+    fn funct3(inst: u32) -> u32 {
+        (inst >> 12) & 0b111
+    }
+
+    /// Extracts funct7 buts from an instruction (inst[31:25])
+    fn funct7(inst: u32) -> u32 {
+        inst >> 25
     }
 }
 
@@ -657,28 +672,6 @@ impl std::fmt::Display for Inst {
             }
         }
     }
-}
-
-// same position as rs2, but as u32
-#[macro_export]
-macro_rules! shamt {
-    ($inst:expr) => {
-        (($inst >> 20) & 0b1_1111)
-    };
-}
-
-#[macro_export]
-macro_rules! funct3 {
-    ($inst:expr) => {
-        (($inst >> 12) & 0b111)
-    };
-}
-
-#[macro_export]
-macro_rules! funct7 {
-    ($inst:expr) => {
-        (($inst >> 25) & 0b111_1111)
-    };
 }
 
 #[macro_export]

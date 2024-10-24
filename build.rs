@@ -150,7 +150,7 @@ fn main() {
         }
         opcode_matches.push(quote! {
             #opcode => {
-                let funct3 = funct3!(inst);
+                let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
                     _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
@@ -167,9 +167,29 @@ fn main() {
                 #funct3 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), imm: inst >> 20})
             });
         }
+        // special case for I-Types w/shamt instead of rs2
+        if let Some(funct3s) = shamt.get(&opcode) {
+            for (funct3, funct7s) in funct3s {
+                let mut funct7_matches: Vec<TokenStream> = vec![];
+                for (funct7, opname) in funct7s {
+                    funct7_matches.push(quote!{
+                        #funct7 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), shamt: Inst::shamt(inst)})
+                    });
+                }
+                funct3_matches.push(quote!{
+                    #funct3 => {
+                        let funct7 = Inst::funct7(inst);
+                        match funct7 {
+                            #(#funct7_matches,)*
+                            _ => { Err(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))}
+                        }
+                    }
+                });
+            }
+        }
         opcode_matches.push(quote! {
             #opcode => {
-                let funct3 = funct3!(inst);
+                let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
                     _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
@@ -190,7 +210,7 @@ fn main() {
             }
             funct3_matches.push(quote!{
                 #funct3 => {
-                    let funct7 = funct7!(inst);
+                    let funct7 = Inst::funct7(inst);
                     match funct7 {
                         #(#funct7_matches,)*
                         _ => { Err(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))}
@@ -198,29 +218,10 @@ fn main() {
                 }
             });
         }
-        // special case for I-Types w/shamt instead of rs2
-        if let Some(funct3s) = shamt.get(&opcode) {
-            for (funct3, funct7s) in funct3s {
-                let mut funct7_matches: Vec<TokenStream> = vec![];
-                for (funct7, opname) in funct7s {
-                    funct7_matches.push(quote!{
-                        #funct7 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), shamt: shamt!(inst)})
-                    });
-                }
-                funct3_matches.push(quote!{
-                    #funct3 => {
-                        let funct7 = funct7!(inst);
-                        match funct7 {
-                            #(#funct7_matches,)*
-                            _ => { Err(format!("unknown/unimplemented opcode+funct3+funct7 {:07b} {:03b} {:07b}", opcode, funct3, funct7))}
-                        }
-                    }
-                });
-            }
-        }
+        
         opcode_matches.push(quote! {
             #opcode => {
-                let funct3 = funct3!(inst);
+                let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
                     _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
@@ -239,7 +240,7 @@ fn main() {
         }
         opcode_matches.push(quote! {
             #opcode => {
-                let funct3 = funct3!(inst);
+                let funct3 = Inst::funct3(inst);
                 match funct3 {
                     #(#funct3_matches,)*
                     _ => { Err(format!("unknown/unimplemented opcode+funct3 {:07b} {:03b}", opcode, funct3))}
