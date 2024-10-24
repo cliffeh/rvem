@@ -277,6 +277,7 @@ impl Index<Reg> for Emulator {
 impl IndexMut<Reg> for Emulator {
     fn index_mut(&mut self, index: Reg) -> &mut Self::Output {
         if index == Reg::zero {
+            self.dev_null = 0u32;
             &mut self.dev_null
         } else {
             &mut self.reg[index as usize]
