@@ -123,9 +123,7 @@ impl std::fmt::Display for Inst {
             }
 
             /* I-Type */
-
             // integer operations
-
             Inst::ADDI { rd, rs1, imm } => {
                 if *rs1 == Reg::zero {
                     write!(f, "li {}, {}", rd, sext(*imm, 12) as i32)
@@ -156,7 +154,6 @@ impl std::fmt::Display for Inst {
             }
 
             // loads
-
             Inst::LB { rd, rs1, imm } => {
                 write!(f, "lb {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
             }
