@@ -245,7 +245,7 @@ impl Emulator {
 
     /// Returns the instruction at memory address `addr`.
     pub fn inst(&self, addr: usize) -> u32 {
-        u32::from_le_bytes(self[addr..addr + 4].try_into().unwrap())
+        *bytemuck::from_bytes(&self[addr..addr + 4])
     }
 }
 
@@ -327,7 +327,7 @@ impl std::fmt::Debug for Emulator {
                 write!(f, "\n.text:")?;
                 let mut i = range.start;
                 while i < range.end {
-                    let word = u32::from_le_bytes(self[i..i + 4].try_into().unwrap());
+                    let word: u32 = *bytemuck::from_bytes(&self[i..i + 4]);
                     let inst = Inst::try_from(word).unwrap();
                     write!(f, "\n  {:x}: {:08x} {:.*}", i, word, i, inst)?;
 
@@ -440,7 +440,7 @@ impl Emulator {
     }
     fn lw(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1] + sext!(imm12, 12)) as usize;
-        self[rd] = u32::from_le_bytes(self[addr..addr + 4].try_into().unwrap());
+        self[rd] = *bytemuck::from_bytes(&self[addr..addr + 4]);
     }
     fn lbu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1] + sext!(imm12, 12)) as usize;

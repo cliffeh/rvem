@@ -14,3 +14,4 @@
   * ...and it's not that hard/expensive to just work with raw u32s?
 * also dump symbol table in debug info?
   * maybe only if alternate is specified?
+* instruction decoding should return an EmulatorError instead of String
