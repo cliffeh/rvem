@@ -8,7 +8,4 @@
 * handle errors for things like:
   * trying to write to .text
   * attempt to divide by zero
-* implement more fmt::Display cases for Instruction
-* I'm not sure I'm actually "happy" with the generated Instruction enum?
-  * it feels "rust-y"...but it's also clunky
-  * ...and it's not that hard/expensive to just work with raw u32s?
+* implement the rest of the fmt::Display cases for Instruction
