@@ -105,6 +105,8 @@ pub struct Emulator {
     sections: HashMap<String, Range<usize>>,
     /// Symbol table
     symtab: HashMap<String, usize>,
+    /// The Great Bit-Bucket in the Sky
+    dev_null: u32,
 }
 
 impl Emulator {
@@ -124,6 +126,7 @@ impl Emulator {
             ],
             sections: HashMap::new(),
             symtab: HashMap::new(),
+            dev_null: 0x0,
         }
     }
 
@@ -208,9 +211,6 @@ impl Emulator {
         self[Reg::sp] = ((self.mem.len() / 8) * 4) as u32;
 
         while text_range.contains(&self.pc) {
-            // we'll just reset to zero each iteration rather than blocking writes
-            self[Reg::zero] = 0;
-
             if log::log_enabled!(log::Level::Trace) {
                 // dump registers
                 log::trace!("{self:?}");
@@ -218,11 +218,9 @@ impl Emulator {
 
             let word = self.curr();
             let inst = Inst::try_from(word).unwrap();
-            // let opcode = opcode!(inst);
 
-            // TODO better disassembly
             if log::log_enabled!(log::Level::Debug) {
-                log::debug!("{:x}: {:08x} {}", self.pc, word, inst);
+                log::debug!("{:x}: {:08x} {:.*}", self.pc, word, self.pc, inst);
             }
 
             inst.execute(self);
@@ -259,6 +257,7 @@ impl Default for Emulator {
             mem: vec![0u8; DEFAULT_MEMORY_SIZE],
             sections: Default::default(),
             symtab: Default::default(),
+            dev_null: Default::default(),
         }
     }
 }
@@ -267,13 +266,21 @@ impl Index<Reg> for Emulator {
     type Output = u32;
 
     fn index(&self, index: Reg) -> &Self::Output {
-        return &self.reg[index as usize];
+        if index == Reg::zero {
+            &0u32
+        } else {
+            &self.reg[index as usize]
+        }
     }
 }
 
 impl IndexMut<Reg> for Emulator {
     fn index_mut(&mut self, index: Reg) -> &mut Self::Output {
-        return &mut self.reg[index as usize];
+        if index == Reg::zero {
+            &mut self.dev_null
+        } else {
+            &mut self.reg[index as usize]
+        }
     }
 }
 
@@ -281,13 +288,13 @@ impl Index<usize> for Emulator {
     type Output = u8;
 
     fn index(&self, index: usize) -> &Self::Output {
-        return &self.mem[index];
+        &self.mem[index]
     }
 }
 
 impl IndexMut<usize> for Emulator {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        return &mut self.mem[index];
+        &mut self.mem[index]
     }
 }
 
@@ -295,13 +302,13 @@ impl Index<Range<usize>> for Emulator {
     type Output = [u8];
 
     fn index(&self, index: Range<usize>) -> &Self::Output {
-        return &self.mem[index];
+        &self.mem[index]
     }
 }
 
 impl IndexMut<Range<usize>> for Emulator {
     fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
-        return &mut self.mem[index];
+        &mut self.mem[index]
     }
 }
 
