@@ -120,16 +120,19 @@ fn main() {
                         #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: inst >> 12})
                     });
                 }
-                // TODO is there a way to output build warnings about ignored lines?
                 _ => {
-                    variants.push(quote! {#opname});
                     if opname == "ECALL" {
-                        // TODO get rid of this?
+                        variants.push(quote! {#opname});
                         opcode_matches.push(quote! {
-                            #opcode => Ok(Inst::ECALL)
+                            #opcode => Ok(Inst::#opname)
                         });
                         exec_matches.push(quote! {Inst::ECALL => em.ecall()});
                     } else {
+                        variants.push(quote! {
+                            // keep the compiler from griping about unused variants
+                            #[allow(dead_code)]
+                            #opname
+                        });
                         exec_matches.push(quote! {Inst::#opname => em.nop()});
                     }
                 }
@@ -260,7 +263,8 @@ fn main() {
 
     let exec_output = quote! {
         impl Inst {
-            fn execute(&self, em: &mut Emulator) {
+            /// Executes a single instruction.
+            pub(crate) fn execute(&self, em: &mut Emulator) {
                 match self {
                     #(#exec_matches),*
                 }

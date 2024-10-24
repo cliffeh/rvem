@@ -10,10 +10,9 @@ The source repository also contains a handful of RISC-V assembly programs for te
 
 There is also a helpful little Makefile for running various tests, traces, binary dumps, etc. Do `make help` to for a list of supported targets.
 
-## What Works?
-All of the test programs run successfully - or at least they do on _my_ computer ;-) - although I'd like to have more testing in place (natch). I've also been trying to maintain a list of [TODOs](TODO.md) for future improvements.
+All of the test programs run successfully - or at least they do on _my_ computer ;-) - although I'd like to have more testing in place (natch). I've been trying to maintain a list of [TODOs](TODO.md) for future improvements.
 
-# References
+## References
 * [RISC-V Instruction Set Manual](https://riscv.org/wp-content/uploads/2017/05/riscv-spec-v2.2.pdf) - Massive PDF describing the entire spec
 * [RV32I Base Integer Instruction Set](https://docs.openhwgroup.org/projects/cva6-user-manual/01_cva6_user/RISCV_Instructions_RV32I.html) - Pseudocode reference for each instruction
 * [RISC-V Instruction Encoder/Decoder](https://luplab.gitlab.io/rvcodecjs/) - Nifty little online instruction encoder/decoder
