@@ -98,8 +98,11 @@ impl Emulator {
                     section.sh_addr,
                     section.sh_size
                 );
-                self[section.vm_range()].copy_from_slice(&buf[section.file_range().unwrap()]);
-                self.sections.insert(name, section.vm_range());
+
+                if let Some(range) = section.file_range() {
+                    self[section.vm_range()].copy_from_slice(&buf[range]);
+                    self.sections.insert(name, section.vm_range());
+                } // TODO if SHT_NOBITS initialize the memory (e.g., .tbss)
             }
         }
 

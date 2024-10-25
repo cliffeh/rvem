@@ -49,12 +49,14 @@ readelf: $(PROG)  ## display ELF information
 .PHONY: readelf
 
 check: $(PROGS)  ## emulate all programs and test their output
-	# for prog in $^; do cargo run -- tests/data/$$prog; done
+	cargo test
 	cargo run -- tests/data/hello | head -1 | grep 'Hello World!'
 	cargo run -- tests/data/fib | head -1 | grep 267914296
 	cargo run -- tests/data/fac | head -1 | grep 120
 	cargo run -- tests/data/strlen | head -1 | grep 44
 .PHONY: check
+
+test: check  ## alias for check
 
 ### targets that actually build things
 $(PROGS): %: tests/data/%.o
