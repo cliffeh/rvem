@@ -510,7 +510,7 @@ impl Emulator {
         match syscall {
             1 => {
                 log::trace!("MIPS print_int"); // https://student.cs.uwaterloo.ca/~isg/res/mips/traps
-                println!("{}", (self[Reg::a0] as i32));
+                print!("{}", (self[Reg::a0] as i32));
                 std::io::stdout().flush().unwrap();
             }
             4 => {

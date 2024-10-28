@@ -1,4 +1,4 @@
-PROGS=hello fac fib strlen
+PROGS=hello complexMul fac fib strlen
 DEFAULT_PROG=hello
 PROG?=$(DEFAULT_PROG)
 
@@ -51,6 +51,7 @@ readelf: $(PROG)  ## display ELF information
 check: $(PROGS)  ## emulate all programs and test their output
 	cargo test
 	cargo run -- tests/data/hello | head -1 | grep 'Hello World!'
+	cargo run -- tests/data/complexMul | head -1 | grep -F -e'-7 + i* 19'
 	cargo run -- tests/data/fib | head -1 | grep 267914296
 	cargo run -- tests/data/fac | head -1 | grep 120
 	cargo run -- tests/data/strlen | head -1 | grep 44
@@ -99,6 +100,7 @@ help: ## show this help
 	@echo "Available programs:"
 	@echo
 	@printf "  \033[0;36m%-22s\033[m %s\n" hello "(default) your bog standard \"Hello, World!\" program"
+	@printf "  \033[0;36m%-22s\033[m %s\n" complexMul "computes (1 + 3i) * (5 + 4i)"
 	@printf "  \033[0;36m%-22s\033[m %s\n" fac "computes 5!"
 	@printf "  \033[0;36m%-22s\033[m %s\n" fib "computes the Fibonacci sequence up to fib(42)"
 	@printf "  \033[0;36m%-22s\033[m %s\n" strlen "computes the length of \"The quick brown fox jumps over the lazy dog.\""
