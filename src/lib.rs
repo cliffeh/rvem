@@ -158,8 +158,8 @@ impl Emulator {
             self.pc = text_range.start;
         }
 
-        // we'll give them the rest of the memory for the stack
-        self[Reg::sp] = self.mem.len() as u32;
+        // stack pointer in the middle?
+        self[Reg::sp] = (self.mem.len()/2) as u32;
 
         while text_range.contains(&self.pc) {
             if log::log_enabled!(log::Level::Trace) {
@@ -182,9 +182,10 @@ impl Emulator {
         if text_range.contains(&self.pc) {
             Ok(())
         } else {
-            Err(EmulatorError::Execution(
-                "program counter outside bounds of .text section".into(),
-            ))
+            Err(EmulatorError::Execution(format!(
+                "program counter outside bounds of .text section: {:08x}",
+                self.pc
+            )))
         }
     }
 
@@ -334,32 +335,32 @@ impl Emulator {
     /* B-Type (branches) */
     fn beq(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if self[rs1] == self[rs2] {
-            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bne(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
         if self[rs1] != self[rs2] {
-            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn blt(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
-        if self[rs1] < self[rs2] {
-            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+        if (self[rs1] as i32) < (self[rs2] as i32) {
+            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bge(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
-        if self[rs1] >= self[rs2] {
-            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+        if (self[rs1] as i32) >= (self[rs2] as i32) {
+            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bltu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
-        if (self[rs1] as u32) < (self[rs2] as u32) {
-            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+        if self[rs1] < self[rs2] {
+            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
     fn bgeu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
-        if (self[rs1] as u32) >= (self[rs2] as u32) {
-            self.pc += (sext(imm13, 12) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+        if self[rs1] >= self[rs2] {
+            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
 
@@ -391,31 +392,31 @@ impl Emulator {
 
     // loads
     fn lb(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext(imm12, 12)) as usize;
+        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
         self[rd] = sext(self[addr] as u32, 8);
     }
     fn lh(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext(imm12, 12)) as usize;
+        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
         self[rd] = self[addr] as u32;
         self[rd] |= sext((self[addr + 1] as u32) << 8, 16);
     }
     fn lw(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext(imm12, 12)) as usize;
+        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
         self[rd] = *bytemuck::from_bytes(&self[addr..addr + 4]);
     }
     fn lbu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext(imm12, 12)) as usize;
+        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
         self[rd] = self[addr] as u32;
     }
     fn lhu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1] + sext(imm12, 12)) as usize;
+        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
         self[rd] = self[addr] as u32;
         self[rd] |= (self[addr + 1] as u32) << 8;
     }
 
     // jump
     fn jalr(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = self[rs1] + sext(imm12, 12);
+        let addr = self[rs1].wrapping_add(sext(imm12, 12));
         self[rd] = self.pc as u32 + 4;
         self.pc = (addr - 4) as usize; // NB subtract 4 since we're auto-incrementing
     }
@@ -429,7 +430,7 @@ impl Emulator {
 
     /* R-Type */
     fn add(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
-        self[rd] = self[rs1] + self[rs2];
+        self[rd] = self[rs1].wrapping_add(self[rs2]);
     }
     fn and(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = self[rs1] & self[rs2];
@@ -457,7 +458,7 @@ impl Emulator {
         self[rd] = self[rs1] >> self[rs2];
     }
     fn sub(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
-        self[rd] = self[rs1] - self[rs2];
+        self[rd] = self[rs1].wrapping_sub(self[rs2]);
     }
     fn xor(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = self[rs1] ^ self[rs2];
