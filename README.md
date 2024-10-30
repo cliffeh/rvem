@@ -1,19 +1,19 @@
 # rvem
 A RISC-V emulator
 
-`rvem` is an emulator that supports a subset of the RISC-V instruction set - specifically, the rv32i base instruction set and the rv32m extensions.
+`rvem` is an emulator that supports a subset of the RISC-V instruction set - specifically, the rv32i base instruction set and rv32m (multiplication/division) extensions.
 
 ## Building & Running
 The emulator is written in Rust. It can be compiled using `cargo build` and/or run using `cargo run`. (Do `cargo run -- --help` for a list of supported command-line options.)
 
 The source repository also contains a handful of RISC-V assembly programs for testing. In order to build these you'll need to install a riscv64 binutils package appropriate to your environment. Known working packages include `binutils-riscv64-linux-gnu` on Ubuntu (installable via apt) and `riscv64-elf-binutils` on MacOS (installable via brew).
 
-There is also a helpful little Makefile for running various tests, traces, binary dumps, etc. Do `make help` to for a list of supported targets.
+There is also a helpful little Makefile for running various tests, traces, binary dumps, etc. Do `make help` for a list of supported targets.
 
 All of the test programs run successfully - or at least they do on _my_ computer ;-) - although I'd like to have more testing in place (natch). I've been trying to maintain a list of [TODOs](TODO.md) for future improvements.
 
 ## Caveats
-This emulator only supports running statically-linked binaries, and (probably) only those assembled from source; i.e., I wouldn't expect a program (cross-)compiled with GCC and dynamically linked to libc to work.
+This emulator only supports running statically-linked binaries, and (probably) only those assembled from source; i.e., I wouldn't expect a program (cross-)compiled with GCC and dynamically linked to libc to work. It also only supports the base instruction set and multiplication extensions, and only has a handful of syscalls implemented.
 
 ## References
 * [RISC-V Instruction Set Manual](https://riscv.org/wp-content/uploads/2017/05/riscv-spec-v2.2.pdf) - Massive PDF describing the entire spec
