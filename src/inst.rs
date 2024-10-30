@@ -76,7 +76,6 @@ impl std::fmt::Display for Inst {
                 };
                 write!(f, "beq {}, {}, {addr}", rs1, rs2)
             }
-
             Inst::BNE { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
                     format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
@@ -85,7 +84,6 @@ impl std::fmt::Display for Inst {
                 };
                 write!(f, "bne {}, {}, {addr}", rs1, rs2)
             }
-
             Inst::BLT { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
                     format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
@@ -94,7 +92,6 @@ impl std::fmt::Display for Inst {
                 };
                 write!(f, "blt {}, {}, {addr}", rs1, rs2)
             }
-
             Inst::BGE { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
                     format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
@@ -103,7 +100,6 @@ impl std::fmt::Display for Inst {
                 };
                 write!(f, "bge {}, {}, {addr}", rs1, rs2)
             }
-
             Inst::BLTU { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
                     format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
@@ -112,7 +108,6 @@ impl std::fmt::Display for Inst {
                 };
                 write!(f, "bltu {}, {}, {addr}", rs1, rs2)
             }
-
             Inst::BGEU { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
                     format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
@@ -132,23 +127,18 @@ impl std::fmt::Display for Inst {
                     Ok(())
                 }
             }
-
             Inst::ANDI { rd, rs1, imm } => {
                 write!(f, "andi {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
             }
-
             Inst::ORI { rd, rs1, imm } => {
                 write!(f, "ori {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
             }
-
             Inst::SLTI { rd, rs1, imm } => {
                 write!(f, "slti {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
             }
-
             Inst::SLTIU { rd, rs1, imm } => {
                 write!(f, "sltiu {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
             }
-
             Inst::XORI { rd, rs1, imm } => {
                 write!(f, "xori {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
             }
@@ -157,21 +147,33 @@ impl std::fmt::Display for Inst {
             Inst::LB { rd, rs1, imm } => {
                 write!(f, "lb {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
             }
-
             Inst::LH { rd, rs1, imm } => {
                 write!(f, "lh {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
             }
-
             Inst::LW { rd, rs1, imm } => {
                 write!(f, "lw {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
             }
-
             Inst::LBU { rd, rs1, imm } => {
                 write!(f, "lbu {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
             }
-
             Inst::LHU { rd, rs1, imm } => {
                 write!(f, "lhu {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
+            }
+
+            // shifts
+            Inst::SLLI { rd, rs1, shamt } => {
+                write!(f, "slli {rd}, {rs1}, {shamt}")
+            }
+            Inst::SRLI { rd, rs1, shamt } => {
+                write!(f, "srli {rd}, {rs1}, {shamt}")
+            }
+            Inst::SRAI { rd, rs1, shamt } => {
+                write!(f, "slai {rd}, {rs1}, {shamt}")
+            }
+
+            // jumps
+            Inst::JALR { rd, rs1, imm } => {
+                write!(f, "jalr {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
             }
 
             /* J-Type */
@@ -184,42 +186,96 @@ impl std::fmt::Display for Inst {
             }
 
             /* R-Type */
+            // integer operations
             Inst::ADD { rd, rs1, rs2 } => {
                 write!(f, "add {}, {}, {}", rd, rs1, rs2)
             }
-
             Inst::AND { rd, rs1, rs2 } => {
                 write!(f, "and {}, {}, {}", rd, rs1, rs2)
             }
-
             Inst::OR { rd, rs1, rs2 } => {
                 write!(f, "or {}, {}, {}", rd, rs1, rs2)
             }
-
+            Inst::SLL { rd, rs1, rs2 } => {
+                write!(f, "sll {}, {}, {}", rd, rs1, rs2)
+            }
+            Inst::SLT { rd, rs1, rs2 } => {
+                write!(f, "slt {}, {}, {}", rd, rs1, rs2)
+            }
+            Inst::SLTU { rd, rs1, rs2 } => {
+                write!(f, "sltu {}, {}, {}", rd, rs1, rs2)
+            }
+            Inst::SRL { rd, rs1, rs2 } => {
+                write!(f, "srl {}, {}, {}", rd, rs1, rs2)
+            }
+            Inst::SRA { rd, rs1, rs2 } => {
+                write!(f, "sra {}, {}, {}", rd, rs1, rs2)
+            }
             Inst::SUB { rd, rs1, rs2 } => {
                 write!(f, "sub {}, {}, {}", rd, rs1, rs2)
             }
-
             Inst::XOR { rd, rs1, rs2 } => {
                 write!(f, "xor {}, {}, {}", rd, rs1, rs2)
+            }
+
+            // multiplication/division extension
+            #[cfg(feature = "rv32m")]
+            Inst::MUL { rd, rs1, rs2 } => {
+                write!(f, "mul {}, {}, {}", rd, rs1, rs2)
+            }
+            #[cfg(feature = "rv32m")]
+            Inst::MULH { rd, rs1, rs2 } => {
+                write!(f, "mulh {}, {}, {}", rd, rs1, rs2)
+            }
+            #[cfg(feature = "rv32m")]
+            Inst::MULHSU { rd, rs1, rs2 } => {
+                write!(f, "mulhsu {}, {}, {}", rd, rs1, rs2)
+            }
+            #[cfg(feature = "rv32m")]
+            Inst::MULHU { rd, rs1, rs2 } => {
+                write!(f, "mulhu {}, {}, {}", rd, rs1, rs2)
+            }
+            #[cfg(feature = "rv32m")]
+            Inst::DIV { rd, rs1, rs2 } => {
+                write!(f, "div {}, {}, {}", rd, rs1, rs2)
+            }
+            #[cfg(feature = "rv32m")]
+            Inst::DIVU { rd, rs1, rs2 } => {
+                write!(f, "divu {}, {}, {}", rd, rs1, rs2)
+            }
+            #[cfg(feature = "rv32m")]
+            Inst::REM { rd, rs1, rs2 } => {
+                write!(f, "rem {}, {}, {}", rd, rs1, rs2)
+            }
+            #[cfg(feature = "rv32m")]
+            Inst::REMU { rd, rs1, rs2 } => {
+                write!(f, "remu {}, {}, {}", rd, rs1, rs2)
+            }
+
+            /* S-Type */
+            Inst::SB { rs1, rs2, imm } => {
+                write!(f, "sb {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
+            }
+
+            Inst::SH { rs1, rs2, imm } => {
+                write!(f, "sh {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
+            }
+
+            Inst::SW { rs1, rs2, imm } => {
+                write!(f, "sw {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
             }
 
             /* U-Type */
             Inst::AUIPC { rd, imm } => {
                 write!(f, "auipc {}, 0x{:x}", rd, *imm)
             }
-
             Inst::LUI { rd, imm } => {
                 write!(f, "lui {}, 0x{:x}", rd, *imm)
             }
 
-            /* S-Type */
-            Inst::SW { rs1, rs2, imm } => {
-                write!(f, "sw {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
-            }
-
             /* syscalls */
             Inst::ECALL => write!(f, "ecall"),
+
             _ => {
                 // TODO implement Diplay for all the rest of the instruction types
                 write!(f, "{:?}", self)

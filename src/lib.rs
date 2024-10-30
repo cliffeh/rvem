@@ -159,7 +159,7 @@ impl Emulator {
         }
 
         // stack pointer in the middle?
-        self[Reg::sp] = (self.mem.len()/2) as u32;
+        self[Reg::sp] = (self.mem.len() / 2) as u32;
 
         while text_range.contains(&self.pc) {
             if log::log_enabled!(log::Level::Trace) {
