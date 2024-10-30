@@ -8,3 +8,4 @@
 * handle errors for things like:
   * trying to write to .text
   * attempt to divide by zero
+* commit a gcc cross-compiled binary for testing

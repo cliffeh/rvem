@@ -459,13 +459,6 @@ impl Emulator {
     fn srl(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = self[rs1] >> self[rs2];
     }
-    fn sub(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
-        self[rd] = self[rs1].wrapping_sub(self[rs2]);
-    }
-    fn xor(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
-        self[rd] = self[rs1] ^ self[rs2];
-    }
-
     fn slli(&mut self, rd: Reg, rs1: Reg, shamt: u32) {
         self[rd] = self[rs1] << shamt;
     }
@@ -474,6 +467,12 @@ impl Emulator {
     }
     fn srai(&mut self, rd: Reg, rs1: Reg, shamt: u32) {
         self[rd] = ((self[rs1] as i32) >> shamt) as u32;
+    }
+    fn sub(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1].wrapping_sub(self[rs2]);
+    }
+    fn xor(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self[rd] = self[rs1] ^ self[rs2];
     }
 
     /* S-Type */
@@ -501,7 +500,6 @@ impl Emulator {
     fn auipc(&mut self, rd: Reg, imm20: u32) {
         self[rd] = self.pc as u32 + (imm20 << 12);
     }
-
     fn lui(&mut self, rd: Reg, imm20: u32) {
         self[rd] = imm20 << 12;
     }
@@ -574,37 +572,29 @@ impl Emulator {
 
 #[cfg(feature = "rv32m")]
 impl Emulator {
-    /* R-Type */
     // NB all multiplication extensions are R-Type
     fn mul(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = ((self[rs1] as i32) * (self[rs2] as i32)) as u32;
     }
-
     fn mulh(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = (((self[rs1] as i64) * (self[rs2] as i64)) >> 32) as u32;
     }
-
     fn mulhu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = (((self[rs1] as u64) * (self[rs2] as u64)) >> 32) as u32;
     }
-
     fn mulhsu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         // NB I don't think this is quite correct, but I'm fuzzy on what is...
         self[rd] = (((self[rs1] as u64) * (self[rs2] as u64)) >> 32) as u32;
     }
-
     fn div(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = ((self[rs1] as i32) / (self[rs2] as i32)) as u32;
     }
-
     fn divu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = self[rs1] / self[rs2];
     }
-
     fn rem(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = ((self[rs1] as i32) % (self[rs2] as i32)) as u32;
     }
-
     fn remu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
         self[rd] = self[rs1] % self[rs2];
     }
