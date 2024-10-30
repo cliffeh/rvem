@@ -58,7 +58,7 @@ impl Inst {
 
     /// Extracts immediate value for an S-Type instruction.
     fn imm_s(inst: u32) -> u32 {
-        (((inst) >> 25) << 7) | (((inst) >> 7) & 0b11111)
+        (((inst) >> 25) << 5) | (((inst) >> 7) & 0b11111)
     }
 }
 
@@ -211,6 +211,11 @@ impl std::fmt::Display for Inst {
 
             Inst::LUI { rd, imm } => {
                 write!(f, "lui {}, 0x{:x}", rd, *imm)
+            }
+
+            /* S-Type */
+            Inst::SW { rs1, rs2, imm } => {
+                write!(f, "sw {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
             }
 
             /* syscalls */

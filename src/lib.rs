@@ -392,13 +392,14 @@ impl Emulator {
 
     // loads
     fn lb(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
-        self[rd] = sext(self[addr] as u32, 8);
+        let addr = ((self[rs1] as i32) + (sext(imm12, 12) as i32)) as usize;
+        let val = self[addr] as u32;
+        self[rd] = sext(val, 8);
     }
     fn lh(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
-        self[rd] = self[addr] as u32;
-        self[rd] |= sext((self[addr + 1] as u32) << 8, 16);
+        let val = (self[addr] as u32) | ((self[addr + 1] as u32) << 8);
+        self[rd] = sext(val, 16);
     }
     fn lw(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
@@ -406,12 +407,13 @@ impl Emulator {
     }
     fn lbu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
-        self[rd] = self[addr] as u32;
+        let val = self[addr] as u32;
+        self[rd] = val;
     }
     fn lhu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
         let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
-        self[rd] = self[addr] as u32;
-        self[rd] |= (self[addr + 1] as u32) << 8;
+        let val = (self[addr] as u32) | ((self[addr + 1] as u32) << 8);
+        self[rd] = val;
     }
 
     // jump
