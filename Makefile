@@ -50,11 +50,6 @@ readelf: $(PROG)  ## display ELF information
 
 check: $(PROGS)  ## emulate all programs and test their output
 	cargo test
-	cargo run -- tests/data/hello | head -1 | grep 'Hello World!'
-	cargo run -- tests/data/complexMul | head -1 | grep -F -e'-7 + i* 19'
-	cargo run -- tests/data/fib | head -1 | grep 267914296
-	cargo run -- tests/data/fac | head -1 | grep 120
-	cargo run -- tests/data/strlen | head -1 | grep 44
 .PHONY: check
 
 test: check  ## alias for check

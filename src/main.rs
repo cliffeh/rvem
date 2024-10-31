@@ -29,9 +29,7 @@ struct Args {
     file: String,
 }
 
-fn main() -> Result<(), EmulatorError> {
-    let args = Args::parse();
-
+fn emulate(args: Args) -> Result<(), EmulatorError> {
     if let Some(log_level) = args.log_level {
         env::set_var("RUST_LOG", log_level);
     }
@@ -48,4 +46,9 @@ fn main() -> Result<(), EmulatorError> {
     }
 
     em.run()
+}
+
+fn main() -> Result<(), EmulatorError> {
+    let args = Args::parse();
+    emulate(args)
 }
