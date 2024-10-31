@@ -48,7 +48,7 @@ fn main() {
             match pieces[0] {
                 // B-Type: imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
                 "imm[12|10:5]" => {
-                    variants.push(quote! {#opname{rs1: Reg, rs2: Reg, imm: u32}});
+                    variants.push(quote! {#opname{rs1: Reg, rs2: Reg, imm: i32}});
                     exec_matches.push(
                         quote! {Inst::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
                     );
@@ -59,7 +59,7 @@ fn main() {
                 }
                 // I-Type: imm[11:0] rs1 000 rd 0010011 ADDI
                 "imm[11:0]" => {
-                    variants.push(quote! {#opname{rd: Reg, rs1: Reg, imm: u32}});
+                    variants.push(quote! {#opname{rd: Reg, rs1: Reg, imm: i32}});
                     exec_matches
                         .push(quote! {Inst::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)});
 
@@ -69,7 +69,7 @@ fn main() {
                 }
                 // J-Type: imm[20|10:1|11|19:12] rd 1101111 JAL
                 "imm[20|10:1|11|19:12]" => {
-                    variants.push(quote! {#opname{rd: Reg,  imm: u32}});
+                    variants.push(quote! {#opname{rd: Reg,  imm: i32}});
                     exec_matches.push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
@@ -102,7 +102,7 @@ fn main() {
                 }
                 // S-Type: imm[11:5] rs2 rs1 000 imm[4:0] 0100011 SB
                 "imm[11:5]" => {
-                    variants.push(quote! {#opname{rs1: Reg, rs2: Reg, imm: u32}});
+                    variants.push(quote! {#opname{rs1: Reg, rs2: Reg, imm: i32}});
                     exec_matches.push(
                         quote! {Inst::#opname{rs1, rs2, imm} => em.#funname(*rs1, *rs2, *imm)},
                     );
@@ -113,11 +113,11 @@ fn main() {
                 }
                 // U-Type: imm[31:12] rd 0110111 LUI
                 "imm[31:12]" => {
-                    variants.push(quote! {#opname{rd: Reg, imm: u32}});
+                    variants.push(quote! {#opname{rd: Reg, imm: i32}});
                     exec_matches.push(quote! {Inst::#opname{rd, imm} => em.#funname(*rd, *imm)});
 
                     opcode_matches.push(quote! {
-                        #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: inst >> 12})
+                        #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: Inst::imm_u(inst)})
                     });
                 }
                 _ => {
@@ -164,7 +164,7 @@ fn main() {
         let mut funct3_matches: Vec<TokenStream> = vec![];
         for (funct3, opname) in funct3s {
             funct3_matches.push(quote! {
-                #funct3 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), imm: inst >> 20})
+                #funct3 => Ok(Inst::#opname{rd: Inst::rd(inst), rs1: Inst::rs1(inst), imm: Inst::imm_i(inst)})
             });
         }
         // special case for I-Types w/shamt instead of rs2

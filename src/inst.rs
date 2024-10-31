@@ -1,4 +1,4 @@
-use crate::{reg::Reg, sext, Emulator, EmulatorError};
+use crate::{reg::Reg, Emulator, EmulatorError};
 
 include!(concat!(env!("OUT_DIR"), "/enum.rs")); // enum Inst
 include!(concat!(env!("OUT_DIR"), "/exec.rs")); // Inst::execute()
@@ -30,35 +30,70 @@ impl Inst {
         (inst >> 20) & 0b1_1111
     }
 
-    /// Extracts funct3 buts from an instruction (inst[14:12]).
+    /// Extracts funct3 bits from an instruction (inst[14:12]).
     fn funct3(inst: u32) -> u32 {
         (inst >> 12) & 0b111
     }
 
-    /// Extracts funct7 buts from an instruction (inst[31:25]).
+    /// Extracts funct7 bits from an instruction (inst[31:25]).
     fn funct7(inst: u32) -> u32 {
-        inst >> 25
+        (inst >> 25) & 0b111_1111
     }
 
     /// Extracts immediate value for a B-Type instruction.
-    fn imm_b(inst: u32) -> u32 {
-        ((((inst) >> 31) & 0x1) << 12)
+    fn imm_b(inst: u32) -> i32 {
+        let base = ((((inst) >> 31) & 0x1) << 12)
             | ((((inst) >> 7) & 0b1) << 11)
             | ((((inst) >> 25) & 0b111111) << 5)
-            | ((((inst) >> 8) & 0b1111) << 1)
+            | ((((inst) >> 8) & 0b1111) << 1);
+        if inst & (1 << 31) == (1 << 31) {
+            (base | 0xfffff000) as i32
+        } else {
+            base as i32
+        }
+    }
+
+    /// Extracts immediate value for an I-Type instruction.
+    fn imm_i(inst: u32) -> i32 {
+        let base = inst >> 20;
+        if inst & (1 << 31) == (1 << 31) {
+            (base | 0xfffff000) as i32
+        } else {
+            base as i32
+        }
     }
 
     /// Extracts immediate value for a J-Type instruction.
-    fn imm_j(inst: u32) -> u32 {
-        ((((inst) >> 31) & 0b1) << 20)
+    fn imm_j(inst: u32) -> i32 {
+        let base = ((((inst) >> 31) & 0b1) << 20)
             | ((((inst) >> 12) & 0b11111111) << 12)
             | ((((inst) >> 20) & 0b1) << 11)
-            | ((((inst) >> 21) & 0b1111111111) << 1)
+            | ((((inst) >> 21) & 0b1111111111) << 1);
+        if inst & (1 << 31) == (1 << 31) {
+            (base | 0xfff00000) as i32
+        } else {
+            base as i32
+        }
     }
 
     /// Extracts immediate value for an S-Type instruction.
-    fn imm_s(inst: u32) -> u32 {
-        (((inst) >> 25) << 5) | (((inst) >> 7) & 0b11111)
+    fn imm_s(inst: u32) -> i32 {
+        let base = (((inst) >> 25) << 5) | (((inst) >> 7) & 0b11111);
+        if inst & (1 << 31) == (1 << 31) {
+            (base | 0xfffff000) as i32
+        } else {
+            base as i32
+        }
+    }
+
+    /// Extracts immediate value for a U-Type instruction.
+    fn imm_u(inst: u32) -> i32 {
+        let base = inst >> 12;
+        if inst & (1 << 31) == (1 << 31) {
+            (base | 0xfff00000) as i32
+        } else {
+            base as i32
+        }
     }
 }
 
@@ -70,49 +105,49 @@ impl std::fmt::Display for Inst {
             /* B-Type */
             Inst::BEQ { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
-                    format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
+                    format!("{:x}", pc as i32 + *imm)
                 } else {
-                    format!("PC+{}", sext(*imm, 12) as i32)
+                    format!("PC+{}", *imm)
                 };
                 write!(f, "beq {}, {}, {addr}", rs1, rs2)
             }
             Inst::BNE { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
-                    format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
+                    format!("{:x}", pc as i32 + *imm)
                 } else {
-                    format!("PC+{}", sext(*imm, 12) as i32)
+                    format!("PC+{}", *imm)
                 };
                 write!(f, "bne {}, {}, {addr}", rs1, rs2)
             }
             Inst::BLT { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
-                    format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
+                    format!("{:x}", pc as i32 + *imm)
                 } else {
-                    format!("PC+{}", sext(*imm, 12) as i32)
+                    format!("PC+{}", *imm)
                 };
                 write!(f, "blt {}, {}, {addr}", rs1, rs2)
             }
             Inst::BGE { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
-                    format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
+                    format!("{:x}", pc as i32 + *imm)
                 } else {
-                    format!("PC+{}", sext(*imm, 12) as i32)
+                    format!("PC+{}", *imm)
                 };
                 write!(f, "bge {}, {}, {addr}", rs1, rs2)
             }
             Inst::BLTU { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
-                    format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
+                    format!("{:x}", pc as i32 + *imm)
                 } else {
-                    format!("PC+{}", sext(*imm, 12) as i32)
+                    format!("PC+{}", *imm)
                 };
                 write!(f, "bltu {}, {}, {addr}", rs1, rs2)
             }
             Inst::BGEU { rs1, rs2, imm } => {
                 let addr = if let Some(pc) = f.precision() {
-                    format!("{:x}", pc as i32 + sext(*imm, 12) as i32)
+                    format!("{:x}", pc as i32 + *imm)
                 } else {
-                    format!("PC+{}", sext(*imm, 12) as i32)
+                    format!("PC+{}", *imm)
                 };
                 write!(f, "bgeu {}, {}, {addr}", rs1, rs2)
             }
@@ -121,43 +156,42 @@ impl std::fmt::Display for Inst {
             // integer operations
             Inst::ADDI { rd, rs1, imm } => {
                 if *rs1 == Reg::zero {
-                    write!(f, "li {}, {}", rd, sext(*imm, 12) as i32)
+                    write!(f, "li {}, {}", rd, *imm)
                 } else {
-                    write!(f, "addi {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)?;
-                    Ok(())
+                    write!(f, "addi {}, {}, {}", rd, rs1, imm)
                 }
             }
             Inst::ANDI { rd, rs1, imm } => {
-                write!(f, "andi {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
+                write!(f, "andi {}, {}, {}", rd, rs1, *imm)
             }
             Inst::ORI { rd, rs1, imm } => {
-                write!(f, "ori {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
+                write!(f, "ori {}, {}, {}", rd, rs1, *imm)
             }
             Inst::SLTI { rd, rs1, imm } => {
-                write!(f, "slti {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
+                write!(f, "slti {}, {}, {}", rd, rs1, *imm)
             }
             Inst::SLTIU { rd, rs1, imm } => {
-                write!(f, "sltiu {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
+                write!(f, "sltiu {}, {}, {}", rd, rs1, *imm)
             }
             Inst::XORI { rd, rs1, imm } => {
-                write!(f, "xori {}, {}, {}", rd, rs1, sext(*imm, 12) as i32)
+                write!(f, "xori {}, {}, {}", rd, rs1, *imm)
             }
 
             // loads
             Inst::LB { rd, rs1, imm } => {
-                write!(f, "lb {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
+                write!(f, "lb {}, {}({})", rd, *imm, rs1)
             }
             Inst::LH { rd, rs1, imm } => {
-                write!(f, "lh {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
+                write!(f, "lh {}, {}({})", rd, *imm, rs1)
             }
             Inst::LW { rd, rs1, imm } => {
-                write!(f, "lw {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
+                write!(f, "lw {}, {}({})", rd, *imm, rs1)
             }
             Inst::LBU { rd, rs1, imm } => {
-                write!(f, "lbu {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
+                write!(f, "lbu {}, {}({})", rd, *imm, rs1)
             }
             Inst::LHU { rd, rs1, imm } => {
-                write!(f, "lhu {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
+                write!(f, "lhu {}, {}({})", rd, *imm, rs1)
             }
 
             // shifts
@@ -173,13 +207,13 @@ impl std::fmt::Display for Inst {
 
             // jumps
             Inst::JALR { rd, rs1, imm } => {
-                write!(f, "jalr {}, {}({})", rd, sext(*imm, 12) as i32, rs1)
+                write!(f, "jalr {}, {}({})", rd, *imm, rs1)
             }
 
             /* J-Type */
             Inst::JAL { rd, imm } => {
                 if let Some(pc) = f.precision() {
-                    write!(f, "j {:x}", (pc as i32 + sext(*imm, 20) as i32))
+                    write!(f, "j {:x}", (pc as i32 + *imm))
                 } else {
                     write!(f, "jal {}, {:x}", rd, *imm)
                 }
@@ -254,15 +288,15 @@ impl std::fmt::Display for Inst {
 
             /* S-Type */
             Inst::SB { rs1, rs2, imm } => {
-                write!(f, "sb {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
+                write!(f, "sb {}, {}({})", rs2, *imm, rs1)
             }
 
             Inst::SH { rs1, rs2, imm } => {
-                write!(f, "sh {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
+                write!(f, "sh {}, {}({})", rs2, *imm, rs1)
             }
 
             Inst::SW { rs1, rs2, imm } => {
-                write!(f, "sw {}, {}({})", rs2, sext(*imm, 12) as i32, rs1)
+                write!(f, "sw {}, {}({})", rs2, *imm, rs1)
             }
 
             /* U-Type */

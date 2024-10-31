@@ -333,100 +333,96 @@ impl Emulator {
     }
 
     /* B-Type (branches) */
-    fn beq(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+    fn beq(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
         if self[rs1] == self[rs2] {
-            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + imm - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bne(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+    fn bne(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
         if self[rs1] != self[rs2] {
-            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + imm - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn blt(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+    fn blt(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
         if (self[rs1] as i32) < (self[rs2] as i32) {
-            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + imm - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bge(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+    fn bge(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
         if (self[rs1] as i32) >= (self[rs2] as i32) {
-            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + imm - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bltu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+    fn bltu(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
         if self[rs1] < self[rs2] {
-            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + imm - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
-    fn bgeu(&mut self, rs1: Reg, rs2: Reg, imm13: u32) {
+    fn bgeu(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
         if self[rs1] >= self[rs2] {
-            self.pc = (self.pc as i32 + (sext(imm13, 12) as i32) - 4) as usize; // NB subtract 4 since we're auto-incrementing
+            self.pc = (self.pc as i32 + imm - 4) as usize; // NB subtract 4 since we're auto-incrementing
         }
     }
 
     /* I-Type */
 
     // integer operations
-    fn addi(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = ((self[rs1] as i32) + (sext(imm12, 12) as i32)) as u32;
+    fn addi(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        self[rd] = ((self[rs1] as i32) + imm) as u32;
     }
-    fn andi(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = self[rs1] & sext(imm12, 12);
+    fn andi(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        self[rd] = self[rs1] & (imm as u32);
     }
-    fn ori(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = self[rs1] | sext(imm12, 12);
+    fn ori(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        self[rd] = self[rs1] | (imm as u32);
     }
-    fn slti(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = if self[rs1] < sext(imm12, 12) { 1 } else { 0 };
+    fn slti(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        self[rd] = if (self[rs1] as i32) < imm { 1 } else { 0 };
     }
-    fn sltiu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = if (self[rs1] as u32) < (sext(imm12, 12) as u32) {
-            1
-        } else {
-            0
-        };
+    fn sltiu(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        self[rd] = if self[rs1] < (imm as u32) { 1 } else { 0 };
     }
-    fn xori(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        self[rd] = self[rs1] ^ sext(imm12, 12);
+    fn xori(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        self[rd] = self[rs1] ^ (imm as u32)
     }
 
     // loads
-    fn lb(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = ((self[rs1] as i32) + (sext(imm12, 12) as i32)) as usize;
+    fn lb(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        let addr = ((self[rs1] as i32) + imm) as usize;
         let val = self[addr] as u32;
         self[rd] = sext(val, 8);
     }
-    fn lh(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
+    fn lh(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        let addr = ((self[rs1] as i32) + imm) as usize;
         let val = (self[addr] as u32) | ((self[addr + 1] as u32) << 8);
         self[rd] = sext(val, 16);
     }
-    fn lw(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
+    fn lw(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        let addr = ((self[rs1] as i32) + imm) as usize;
         self[rd] = *bytemuck::from_bytes(&self[addr..addr + 4]);
     }
-    fn lbu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
+    fn lbu(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        let addr = ((self[rs1] as i32) + imm) as usize;
         let val = self[addr] as u32;
         self[rd] = val;
     }
-    fn lhu(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = (self[rs1].wrapping_add(sext(imm12, 12))) as usize;
+    fn lhu(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        let addr = ((self[rs1] as i32) + imm) as usize;
         let val = (self[addr] as u32) | ((self[addr + 1] as u32) << 8);
         self[rd] = val;
     }
 
     // jump
-    fn jalr(&mut self, rd: Reg, rs1: Reg, imm12: u32) {
-        let addr = self[rs1].wrapping_add(sext(imm12, 12));
+    fn jalr(&mut self, rd: Reg, rs1: Reg, imm: i32) {
+        let addr = ((self[rs1] as i32) + imm) as usize;
         self[rd] = self.pc as u32 + 4;
         self.pc = (addr - 4) as usize; // NB subtract 4 since we're auto-incrementing
     }
 
     /* J-Type */
-    fn jal(&mut self, rd: Reg, imm20: u32) {
+    fn jal(&mut self, rd: Reg, imm: i32) {
         self[rd] = (self.pc + 4) as u32;
-        let addr = (self.pc as i32 + sext(imm20, 20) as i32) - 4; // NB subtract 4 since we're auto-incrementing
+        let addr = self.pc as i32 + imm - 4; // NB subtract 4 since we're auto-incrementing
         self.pc = addr as usize;
     }
 
@@ -476,19 +472,19 @@ impl Emulator {
     }
 
     /* S-Type */
-    fn sb(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
-        let addr = self[rs1].wrapping_add(sext(imm12, 12)) as usize;
+    fn sb(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
+        let addr = (self[rs1] as i32 + imm) as usize;
         let bytes = self[rs2].to_le_bytes();
         self[addr] = bytes[0];
     }
-    fn sh(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
-        let addr = self[rs1].wrapping_add(sext(imm12, 12)) as usize;
+    fn sh(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
+        let addr = (self[rs1] as i32 + imm) as usize;
         let bytes = self[rs2].to_le_bytes();
         self[addr] = bytes[0];
         self[addr + 1] = bytes[1];
     }
-    fn sw(&mut self, rs1: Reg, rs2: Reg, imm12: u32) {
-        let addr = self[rs1].wrapping_add(sext(imm12, 12)) as usize;
+    fn sw(&mut self, rs1: Reg, rs2: Reg, imm: i32) {
+        let addr = (self[rs1] as i32 + imm) as usize;
         let bytes = self[rs2].to_le_bytes();
         self[addr] = bytes[0];
         self[addr + 1] = bytes[1];
@@ -497,11 +493,11 @@ impl Emulator {
     }
 
     /* U-Type */
-    fn auipc(&mut self, rd: Reg, imm20: u32) {
-        self[rd] = self.pc as u32 + (imm20 << 12);
+    fn auipc(&mut self, rd: Reg, imm: i32) {
+        self[rd] = self.pc as u32 + (imm << 12) as u32;
     }
-    fn lui(&mut self, rd: Reg, imm20: u32) {
-        self[rd] = imm20 << 12;
+    fn lui(&mut self, rd: Reg, imm: i32) {
+        self[rd] = (imm << 12) as u32;
     }
 
     /* system calls */

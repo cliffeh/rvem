@@ -54,6 +54,7 @@ check: $(PROGS)  ## emulate all programs and test their output
 
 test: check  ## alias for check
 
+
 ### targets that actually build things
 $(PROGS): %: tests/data/%.o
 	$(ASPREFIX)-ld -melf32lriscv -o tests/data/$@ $<
