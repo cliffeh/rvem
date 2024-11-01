@@ -3,6 +3,7 @@ use crate::{reg::Reg, Emulator, EmulatorError};
 include!(concat!(env!("OUT_DIR"), "/enum.rs")); // enum Inst
 include!(concat!(env!("OUT_DIR"), "/exec.rs")); // Inst::execute()
 include!(concat!(env!("OUT_DIR"), "/decode.rs")); // impl TryFrom<u32> for Inst
+include!(concat!(env!("OUT_DIR"), "/encode.rs")); // impl From<Inst> for u32
 
 impl Inst {
     /// Extracts the opcode from an instruction (inst[6:0]).
@@ -94,6 +95,40 @@ impl Inst {
         } else {
             base as i32
         }
+    }
+
+    /// Encodes a B-Type Inst as a u32.
+    ///
+    /// ```rust
+    /// use rvem::Inst;
+    ///
+    /// let word = 0x02238a63;
+    /// let inst = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(inst);
+    /// assert_eq!(word, encode);
+    /// ```
+    fn b_type(opcode: u32, funct3: u32, rs1: Reg, rs2: Reg, imm: i32) -> u32 {
+        let bits = imm as u32;
+        let bits = ((bits & (1 << 12)) << 19) // inst[31]
+            | ((bits & (0b0011_1111 << 5)) << 20)  // inst[30:25]
+            | ((bits & (0b1111 << 1)) << 7) // inst[11:8]
+            | ((bits & (1 << 11)) >> 4); // inst[7]
+        bits | (u32::from(rs2) << 20) | (u32::from(rs1) << 15) | (funct3 << 12) | opcode
+    }
+
+    /// Encodes a I-Type Inst as a u32.
+    ///
+    /// ```rust
+    /// use rvem::Inst;
+    ///
+    /// let word = 0x02058593;
+    /// let inst = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(inst);
+    /// assert_eq!(word, encode);
+    /// ```
+    fn i_type(opcode: u32, funct3: u32, rd: Reg, rs1: Reg, imm: i32) -> u32 {
+        let bits = (imm << 20) as u32;
+        bits | (u32::from(rs1) << 15) | (funct3 << 12) |(u32::from(rd) << 7) | opcode
     }
 }
 

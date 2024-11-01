@@ -16,6 +16,7 @@ fn sanitize_name(name: &str) -> String {
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let decode_path = Path::new(&out_dir).join("decode.rs");
+    let encode_path = Path::new(&out_dir).join("encode.rs");
     let enum_path = Path::new(&out_dir).join("enum.rs");
     let exec_path = Path::new(&out_dir).join("exec.rs");
 
@@ -29,6 +30,7 @@ fn main() {
 
     let mut opcode_matches: Vec<TokenStream> = vec![];
     let mut exec_matches: Vec<TokenStream> = vec![];
+    let mut encode_matches: Vec<TokenStream> = vec![];
 
     let mut tables: Vec<&str> = vec!["src/rv32i.tab"];
 
@@ -54,6 +56,10 @@ fn main() {
                     );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                    encode_matches.push(quote!{Inst::#opname{rs1, rs2, imm} => {
+                        Inst::b_type(#opcode, #funct3, rs1, rs2, imm)
+                    }});
+
                     let funct3s = btype.entry(opcode).or_default();
                     funct3s.insert(funct3, opname);
                 }
@@ -64,6 +70,10 @@ fn main() {
                         .push(quote! {Inst::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)});
 
                     let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
+                    encode_matches.push(quote!{Inst::#opname{rd, rs1, imm} => {
+                        Inst::i_type(#opcode, #funct3, rd, rs1, imm)
+                    }});
+
                     let funct3s = itype.entry(opcode).or_default();
                     funct3s.insert(funct3, opname);
                 }
@@ -292,6 +302,23 @@ fn main() {
     let formatted = prettyplease::unparse(&syntax_tree);
     fs::write(&decode_path, formatted).unwrap();
 
+    let encode_output = quote! {
+        impl From<Inst> for u32 {
+            fn from(inst: Inst) -> u32 {
+                match inst {
+                    #(#encode_matches,)*
+                    // TODO get rid of this
+                    _ => unimplemented!(),
+                }
+            }
+        }
+    };
+    let syntax_tree = syn::parse2(encode_output).unwrap();
+    let formatted = prettyplease::unparse(&syntax_tree);
+    fs::write(&encode_path, formatted).unwrap();
+
     println!("cargo::rerun-if-changed=src/lib.rs");
+    println!("cargo::rerun-if-changed=src/inst.rs");
     println!("cargo::rerun-if-changed=src/rv32i.tab");
+    println!("cargo::rerun-if-changed=src/rv32m.tab");
 }

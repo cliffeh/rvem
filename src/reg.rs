@@ -108,7 +108,6 @@ impl Reg {
     pub const fp: Reg = Reg::s0;
 }
 
-// TODO I feel like there should be a better way than this...
 impl From<u32> for Reg {
     fn from(value: u32) -> Self {
         match value {
@@ -145,6 +144,45 @@ impl From<u32> for Reg {
             30 => Reg::x30,
             31 => Reg::x31,
             _ => unimplemented!("unimplemented register value: {}", value),
+        }
+    }
+}
+
+impl From<Reg> for u32 {
+    fn from(value: Reg) -> Self {
+        match value {
+            Reg::x0 => 0u32,
+            Reg::x1 => 1u32,
+            Reg::x2 => 2u32,
+            Reg::x3 => 3u32,
+            Reg::x4 => 4u32,
+            Reg::x5 => 5u32,
+            Reg::x6 => 6u32,
+            Reg::x7 => 7u32,
+            Reg::x8 => 8u32,
+            Reg::x9 => 9u32,
+            Reg::x10 => 10u32,
+            Reg::x11 => 11u32,
+            Reg::x12 => 12u32,
+            Reg::x13 => 13u32,
+            Reg::x14 => 14u32,
+            Reg::x15 => 15u32,
+            Reg::x16 => 16u32,
+            Reg::x17 => 17u32,
+            Reg::x18 => 18u32,
+            Reg::x19 => 19u32,
+            Reg::x20 => 20u32,
+            Reg::x21 => 21u32,
+            Reg::x22 => 22u32,
+            Reg::x23 => 23u32,
+            Reg::x24 => 24u32,
+            Reg::x25 => 25u32,
+            Reg::x26 => 26u32,
+            Reg::x27 => 27u32,
+            Reg::x28 => 28u32,
+            Reg::x29 => 29u32,
+            Reg::x30 => 30u32,
+            Reg::x31 => 31u32,
         }
     }
 }

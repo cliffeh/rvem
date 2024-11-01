@@ -10,9 +10,9 @@ use strum::IntoEnumIterator;
 use thiserror::Error;
 
 pub(crate) mod reg;
-use reg::Reg;
+pub use reg::Reg;
 pub(crate) mod inst;
-use inst::Inst;
+pub use inst::Inst;
 
 /// Default amount of memory to allocate if not specified
 pub const DEFAULT_MEMORY_SIZE: usize = 1 << 20;
