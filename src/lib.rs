@@ -167,10 +167,10 @@ impl Emulator {
                 log::trace!("{self:?}");
             }
 
-            let word = self.curr();
-            let inst = Inst::try_from(word)?;
+            let inst = self.curr()?;
 
             if log::log_enabled!(log::Level::Debug) {
+                let word = self[self.pc];
                 log::debug!("{:x}: {:08x} {:.*}", self.pc, word, self.pc, inst);
             }
 
@@ -191,13 +191,14 @@ impl Emulator {
 
     /// Returns the current instruction - i.e., the instruction the program
     /// counter is currently pointing at.
-    pub fn curr(&self) -> u32 {
+    pub fn curr(&self) -> Result<Inst, EmulatorError> {
         self.inst(self.pc)
     }
 
     /// Returns the instruction at memory address `addr`.
-    pub fn inst(&self, addr: usize) -> u32 {
-        *bytemuck::from_bytes(&self[addr..addr + 4])
+    pub fn inst(&self, addr: usize) -> Result<Inst, EmulatorError> {
+        let word: u32 = *bytemuck::from_bytes(&self[addr..addr + 4]);
+        Inst::try_from(word)
     }
 }
 
