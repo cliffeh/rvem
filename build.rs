@@ -130,6 +130,10 @@ fn main() {
                     );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
+                    encode_matches.push(quote!{Inst::#opname{rs1, rs2, imm} => {
+                        Inst::s_type(#opcode, #funct3, rs1, rs2, imm)
+                    }});
+
                     let funct3s = stype.entry(opcode).or_default();
                     funct3s.insert(funct3, opname);
                 }
@@ -141,6 +145,10 @@ fn main() {
                     opcode_matches.push(quote! {
                         #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: Inst::imm_u(inst)})
                     });
+
+                    encode_matches.push(quote!{Inst::#opname{rd, imm} => {
+                        Inst::u_type(#opcode, rd, imm)
+                    }});
                 }
                 _ => {
                     if opname == "ECALL" {
@@ -149,6 +157,8 @@ fn main() {
                             #opcode => Ok(Inst::#opname)
                         });
                         exec_matches.push(quote! {Inst::ECALL => em.ecall()});
+
+                        encode_matches.push(quote!{Inst::ECALL => #opcode});
                     } else {
                         variants.push(quote! {
                             // keep the compiler from griping about unused variants

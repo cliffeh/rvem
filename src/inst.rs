@@ -188,6 +188,38 @@ impl Inst {
             | (u32::from(rd) << 7)
             | opcode
     }
+
+    /// Encodes a S-Type Inst as a u32.
+    ///
+    /// ```rust
+    /// use rvem::Inst;
+    ///
+    /// let word = 0xd6a1a023;
+    /// let inst = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(inst);
+    /// assert_eq!(word, encode);
+    /// ```
+    fn s_type(opcode: u32, funct3: u32, rs1: Reg, rs2: Reg, imm: i32) -> u32 {
+        let bits = imm as u32;
+        let bits = ((bits & (0b111_1111 << 5)) << 20) // inst[31:25]
+         | ((bits & (0b1_1111)) << 7); // inst[11:7]
+        bits | (u32::from(rs2) << 20) | (u32::from(rs1) << 15) | (funct3 << 12) | opcode
+    }
+
+    /// Encodes a U-Type Inst as a u32.
+    ///
+    /// ```rust
+    /// use rvem::Inst;
+    ///
+    /// let word = 0x808088b7;
+    /// let inst = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(inst);
+    /// assert_eq!(word, encode);
+    /// ```
+    fn u_type(opcode: u32, rd: Reg, imm: i32) -> u32 {
+        let bits = (imm << 12) as u32;
+        bits | (u32::from(rd) << 7) | opcode
+    }
 }
 
 impl std::fmt::Display for Inst {
