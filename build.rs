@@ -56,7 +56,7 @@ fn main() {
                     );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
-                    encode_matches.push(quote!{Inst::#opname{rs1, rs2, imm} => {
+                    encode_matches.push(quote! {Inst::#opname{rs1, rs2, imm} => {
                         Inst::b_type(#opcode, #funct3, rs1, rs2, imm)
                     }});
 
@@ -70,7 +70,7 @@ fn main() {
                         .push(quote! {Inst::#opname{rd, rs1, imm} => em.#funname(*rd, *rs1, *imm)});
 
                     let funct3 = u32::from_str_radix(pieces[2], 2).unwrap();
-                    encode_matches.push(quote!{Inst::#opname{rd, rs1, imm} => {
+                    encode_matches.push(quote! {Inst::#opname{rd, rs1, imm} => {
                         Inst::i_type(#opcode, #funct3, rd, rs1, imm)
                     }});
 
@@ -86,7 +86,7 @@ fn main() {
                         #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: Inst::imm_j(inst)})
                     });
 
-                    encode_matches.push(quote!{Inst::#opname{rd, imm} => {
+                    encode_matches.push(quote! {Inst::#opname{rd, imm} => {
                         Inst::j_type(#opcode, rd, imm)
                     }});
                 }
@@ -99,7 +99,7 @@ fn main() {
                         variants.push(quote! {#opname{rd: Reg, rs1: Reg, shamt: u32}});
                         exec_matches.push(quote!{Inst::#opname{rd, rs1, shamt} => em.#funname(*rd, *rs1, *shamt)});
 
-                        encode_matches.push(quote!{Inst::#opname{rd, rs1, shamt} => {
+                        encode_matches.push(quote! {Inst::#opname{rd, rs1, shamt} => {
                             Inst::i_type_shamt(#opcode, #funct3, #funct7, rd, rs1, shamt)
                         }});
 
@@ -113,7 +113,7 @@ fn main() {
                             quote! {Inst::#opname{rd, rs1, rs2} => em.#funname(*rd, *rs1, *rs2)},
                         );
 
-                        encode_matches.push(quote!{Inst::#opname{rd, rs1, rs2} => {
+                        encode_matches.push(quote! {Inst::#opname{rd, rs1, rs2} => {
                             Inst::r_type(#opcode, #funct3, #funct7, rd, rs1, rs2)
                         }});
 
@@ -130,7 +130,7 @@ fn main() {
                     );
 
                     let funct3 = u32::from_str_radix(pieces[3], 2).unwrap();
-                    encode_matches.push(quote!{Inst::#opname{rs1, rs2, imm} => {
+                    encode_matches.push(quote! {Inst::#opname{rs1, rs2, imm} => {
                         Inst::s_type(#opcode, #funct3, rs1, rs2, imm)
                     }});
 
@@ -146,7 +146,7 @@ fn main() {
                         #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: Inst::imm_u(inst)})
                     });
 
-                    encode_matches.push(quote!{Inst::#opname{rd, imm} => {
+                    encode_matches.push(quote! {Inst::#opname{rd, imm} => {
                         Inst::u_type(#opcode, rd, imm)
                     }});
                 }
@@ -158,7 +158,7 @@ fn main() {
                         });
                         exec_matches.push(quote! {Inst::ECALL => em.ecall()});
 
-                        encode_matches.push(quote!{Inst::ECALL => #opcode});
+                        encode_matches.push(quote! {Inst::ECALL => #opcode});
                     } else {
                         variants.push(quote! {
                             // keep the compiler from griping about unused variants

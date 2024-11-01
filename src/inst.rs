@@ -102,9 +102,9 @@ impl Inst {
     /// ```rust
     /// use rvem::Inst;
     ///
-    /// let word = 0x02238a63;
-    /// let inst = Inst::try_from(word).unwrap();
-    /// let encode = u32::from(inst);
+    /// let word = 0x02238a63; // beq x7, x2, 52
+    /// let decode = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(decode);
     /// assert_eq!(word, encode);
     /// ```
     fn b_type(opcode: u32, funct3: u32, rs1: Reg, rs2: Reg, imm: i32) -> u32 {
@@ -121,10 +121,10 @@ impl Inst {
     /// ```rust
     /// use rvem::Inst;
     ///
-    /// let word = 0x02058593;
+    /// let word = 0x02058593; // addi x11, x11, 32
     /// let inst = Inst::try_from(word).unwrap();
-    /// let encode = u32::from(inst);
-    /// assert_eq!(word, encode);
+    /// let decode = u32::from(inst);
+    /// assert_eq!(word, decode);
     /// ```
     fn i_type(opcode: u32, funct3: u32, rd: Reg, rs1: Reg, imm: i32) -> u32 {
         let bits = (imm << 20) as u32;
@@ -136,9 +136,9 @@ impl Inst {
     /// ```rust
     /// use rvem::Inst;
     ///
-    /// let word = 0x00361613;
-    /// let inst = Inst::try_from(word).unwrap();
-    /// let encode = u32::from(inst);
+    /// let word = 0x00361613; // slli x12, x12, 3
+    /// let decode = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(decode);
     /// assert_eq!(word, encode);
     /// ```
     fn i_type_shamt(opcode: u32, funct3: u32, funct7: u32, rd: Reg, rs1: Reg, shamt: u32) -> u32 {
@@ -155,9 +155,9 @@ impl Inst {
     /// ```rust
     /// use rvem::Inst;
     ///
-    /// let word = 0xfedff06f;
-    /// let inst = Inst::try_from(word).unwrap();
-    /// let encode = u32::from(inst);
+    /// let word = 0xfedff06f; // jal x0, -20
+    /// let decode = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(decode);
     /// assert_eq!(word, encode);
     /// ```
     fn j_type(opcode: u32, rd: Reg, imm: i32) -> u32 {
@@ -175,9 +175,9 @@ impl Inst {
     /// ```rust
     /// use rvem::Inst;
     ///
-    /// let word = 0x00e787b3;
-    /// let inst = Inst::try_from(word).unwrap();
-    /// let encode = u32::from(inst);
+    /// let word = 0x00e787b3; // add x15, x15, x14
+    /// let decode = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(decode);
     /// assert_eq!(word, encode);
     /// ```
     fn r_type(opcode: u32, funct3: u32, funct7: u32, rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
@@ -194,9 +194,9 @@ impl Inst {
     /// ```rust
     /// use rvem::Inst;
     ///
-    /// let word = 0xd6a1a023;
-    /// let inst = Inst::try_from(word).unwrap();
-    /// let encode = u32::from(inst);
+    /// let word = 0xd6a1a023; // sw x10, -672(x3)
+    /// let decode = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(decode);
     /// assert_eq!(word, encode);
     /// ```
     fn s_type(opcode: u32, funct3: u32, rs1: Reg, rs2: Reg, imm: i32) -> u32 {
@@ -211,9 +211,9 @@ impl Inst {
     /// ```rust
     /// use rvem::Inst;
     ///
-    /// let word = 0x808088b7;
-    /// let inst = Inst::try_from(word).unwrap();
-    /// let encode = u32::from(inst);
+    /// let word = 0x808088b7; // lui x17, -522232
+    /// let decode = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(decode);
     /// assert_eq!(word, encode);
     /// ```
     fn u_type(opcode: u32, rd: Reg, imm: i32) -> u32 {
