@@ -9,6 +9,14 @@ fn test_hello() {
 }
 
 #[test]
+fn test_helloc() {
+    let mut cmd = Command::cargo_bin("rvem").unwrap();
+    let assert = cmd.arg("tests/data/helloc").assert();
+
+    assert.success().code(0).stdout("Hello, World!\n");
+}
+
+#[test]
 #[allow(non_snake_case)]
 fn test_complexMul() {
     let mut cmd = Command::cargo_bin("rvem").unwrap();
