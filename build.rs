@@ -85,6 +85,10 @@ fn main() {
                     opcode_matches.push(quote! {
                         #opcode => Ok(Inst::#opname{rd: Inst::rd(inst), imm: Inst::imm_j(inst)})
                     });
+
+                    encode_matches.push(quote!{Inst::#opname{rd, imm} => {
+                        Inst::j_type(#opcode, rd, imm)
+                    }});
                 }
                 // R-Type: 0000000 rs2 rs1 000 rd 0110011 ADD
                 "0000000" | "0000001" | "0100000" => {
@@ -95,6 +99,10 @@ fn main() {
                         variants.push(quote! {#opname{rd: Reg, rs1: Reg, shamt: u32}});
                         exec_matches.push(quote!{Inst::#opname{rd, rs1, shamt} => em.#funname(*rd, *rs1, *shamt)});
 
+                        encode_matches.push(quote!{Inst::#opname{rd, rs1, shamt} => {
+                            Inst::i_type_shamt(#opcode, #funct3, #funct7, rd, rs1, shamt)
+                        }});
+
                         let funct3s = shamt.entry(opcode).or_default();
                         let funct7s = funct3s.entry(funct3).or_default();
                         funct7s.insert(funct7, opname);
@@ -104,6 +112,10 @@ fn main() {
                         exec_matches.push(
                             quote! {Inst::#opname{rd, rs1, rs2} => em.#funname(*rd, *rs1, *rs2)},
                         );
+
+                        encode_matches.push(quote!{Inst::#opname{rd, rs1, rs2} => {
+                            Inst::r_type(#opcode, #funct3, #funct7, rd, rs1, rs2)
+                        }});
 
                         let funct3s = rtype.entry(opcode).or_default();
                         let funct7s = funct3s.entry(funct3).or_default();

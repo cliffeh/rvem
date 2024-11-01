@@ -128,7 +128,65 @@ impl Inst {
     /// ```
     fn i_type(opcode: u32, funct3: u32, rd: Reg, rs1: Reg, imm: i32) -> u32 {
         let bits = (imm << 20) as u32;
-        bits | (u32::from(rs1) << 15) | (funct3 << 12) |(u32::from(rd) << 7) | opcode
+        bits | (u32::from(rs1) << 15) | (funct3 << 12) | (u32::from(rd) << 7) | opcode
+    }
+
+    /// Encodes a I-Type shamt Inst as a u32.
+    ///
+    /// ```rust
+    /// use rvem::Inst;
+    ///
+    /// let word = 0x00361613;
+    /// let inst = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(inst);
+    /// assert_eq!(word, encode);
+    /// ```
+    fn i_type_shamt(opcode: u32, funct3: u32, funct7: u32, rd: Reg, rs1: Reg, shamt: u32) -> u32 {
+        (funct7 << 25)
+            | (shamt << 20)
+            | (u32::from(rs1) << 15)
+            | (funct3 << 12)
+            | (u32::from(rd) << 7)
+            | opcode
+    }
+
+    /// Encodes a J-Type Inst as a u32.
+    ///
+    /// ```rust
+    /// use rvem::Inst;
+    ///
+    /// let word = 0xfedff06f;
+    /// let inst = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(inst);
+    /// assert_eq!(word, encode);
+    /// ```
+    fn j_type(opcode: u32, rd: Reg, imm: i32) -> u32 {
+        let bits = imm as u32;
+        let bits = ((bits & (1<<20)) << 11) // inst[31]
+            | ((bits & (0b11_1111_1111 << 1)) << 20) // inst[30:21]
+            | ((bits & (1 << 11)) << 9) // inst[20]
+            | (bits & (0b1111_1111 << 12)) // inst[19:12]
+        ;
+        bits | (u32::from(rd) << 7) | opcode
+    }
+
+    /// Encodes a R-Type shamt Inst as a u32.
+    ///
+    /// ```rust
+    /// use rvem::Inst;
+    ///
+    /// let word = 0x00e787b3;
+    /// let inst = Inst::try_from(word).unwrap();
+    /// let encode = u32::from(inst);
+    /// assert_eq!(word, encode);
+    /// ```
+    fn r_type(opcode: u32, funct3: u32, funct7: u32, rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+        (funct7 << 25)
+            | (u32::from(rs2) << 20)
+            | (u32::from(rs1) << 15)
+            | (funct3 << 12)
+            | (u32::from(rd) << 7)
+            | opcode
     }
 }
 
