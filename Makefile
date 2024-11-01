@@ -2,18 +2,6 @@ PROGS=hello complexMul fac fib strlen
 DEFAULT_PROG=hello
 PROG?=$(DEFAULT_PROG)
 
-# Detect the platform
-UNAME_S := $(shell uname -s)
-
-# Set the toolchain prefix based on the platform
-ifeq ($(UNAME_S), Linux)
-    ASPREFIX = riscv64-linux-gnu
-else ifeq ($(UNAME_S), Darwin)
-    ASPREFIX = riscv64-elf
-else
-    $(error Unsupported platform: $(UNAME_S))
-endif
-
 default: help
 
 build: target/debug/rvem  # builds the RISC-V emulator
@@ -52,16 +40,10 @@ check: $(PROGS)  ## emulate all programs and test their output
 	cargo test
 .PHONY: check
 
+$(PROGS):
+	make -C tests/data $@
+
 test: check  ## alias for check
-
-
-### targets that actually build things
-$(PROGS): %: tests/data/%.o
-	$(ASPREFIX)-ld -melf32lriscv -o tests/data/$@ $<
-
-%.o: %.s
-	$(ASPREFIX)-as -march=rv32im $< -o $@
-
 
 format:  ## beautify rust code
 	cargo fmt

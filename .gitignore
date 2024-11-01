@@ -18,11 +18,6 @@ target/
 
 # generated files (for testing)
 *.o
-hello
-complexMul
-fac
-fib
-strlen
 
 # temporary/scratch files
 scratch
