@@ -13,6 +13,22 @@ All of the test programs can be emulated successfully - or at least they can on 
 ## Caveats
 This emulator only supports running statically-linked binaries, and (probably) only those assembled from source; i.e., I wouldn't expect a program (cross-)compiled with GCC and dynamically linked to libc to work. It also only supports the base instruction set and multiplication extensions, and only has a handful of syscalls implemented.
 
+## Toolchains
+One of the testing challenges is finding a toolchain that will cross-compile for a RISC-V architecture, including the necessary ABI. For assembling and linking some platforms have available packages (see above), but at least for the `helloc` test program (cross-compiled from C code) I had to build my own toolchain. I don't think that is a reasonable expectation for someone else to do, buit for posterity this is roughly what that looked like:
+
+```shell
+# NB much repo, many clone
+git clone --recursive https://github.com/riscv/riscv-gnu-toolchain
+riscv-gnu-toolchain
+./configure --prefix=/opt/riscv --with-arch=rv32im --with-abi=ilp32 --enable-multilib
+# NB this takes (roughly) forever to build
+sudo make
+# `hello.c` source code left as an exercise for the reader ;-)
+/opt/riscv/bin/riscv32-unknown-elf-gcc -march=rv32im -mabi=ilp32 -o hello hello.c
+```
+
+Note that the upshot of this is that if you've installed a pre-packaged toolchain you likely won't be able to use it for things like `make objdump` on `helloc`.
+
 ## References
 * [RISC-V Instruction Set Manual](https://riscv.org/wp-content/uploads/2017/05/riscv-spec-v2.2.pdf) - Massive PDF describing the entire spec
 * [RV32I Base Integer Instruction Set](https://docs.openhwgroup.org/projects/cva6-user-manual/01_cva6_user/RISCV_Instructions_RV32I.html) - Pseudocode reference for each instruction

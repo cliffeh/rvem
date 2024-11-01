@@ -1,4 +1,4 @@
-PROGS=hello complexMul fac fib strlen
+PROGS=hello complexMul fac fib strlen  # helloc
 
 # Detect the platform
 UNAME_S := $(shell uname -s)
@@ -11,6 +11,9 @@ else ifeq ($(UNAME_S), Darwin)
 else
     $(error Unsupported platform: $(UNAME_S))
 endif
+
+helloc:
+	touch helloc
 
 $(PROGS): %: %.o
 	$(ASPREFIX)-ld -melf32lriscv -o $@ $<

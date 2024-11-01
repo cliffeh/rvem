@@ -1,4 +1,4 @@
-PROGS=hello complexMul fac fib strlen
+PROGS=hello helloc complexMul fac fib strlen
 DEFAULT_PROG=hello
 PROG?=$(DEFAULT_PROG)
 
@@ -78,6 +78,7 @@ help: ## show this help
 	@echo "Available programs:"
 	@echo
 	@printf "  \033[0;36m%-22s\033[m %s\n" hello "(default) your bog standard \"Hello, World!\" program"
+	@printf "  \033[0;36m%-22s\033[m %s\n" helloc "\"Hello, World!\", but cross-compiled from C code"
 	@printf "  \033[0;36m%-22s\033[m %s\n" complexMul "computes (1 + 3i) * (5 + 4i)"
 	@printf "  \033[0;36m%-22s\033[m %s\n" fac "computes 5!"
 	@printf "  \033[0;36m%-22s\033[m %s\n" fib "computes the Fibonacci sequence up to fib(42)"
