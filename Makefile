@@ -1,4 +1,5 @@
-PROGS=hello helloc complexMul fac fib strlen
+PROGS=hello complexMul fac fib strlen  # helloc
+PROGS_PATH=$(patsubst %, tests/data/%, $(PROGS))
 DEFAULT_PROG=hello
 PROG?=$(DEFAULT_PROG)
 
@@ -36,12 +37,17 @@ readelf: $(PROG)  ## display ELF information
 	$(ASPREFIX)-readelf -a tests/data/$<
 .PHONY: readelf
 
-check: $(PROGS)  ## emulate all programs and test their output
+check: $(PROGS_PATH)  ## emulate all programs and test their output
 	cargo test
 .PHONY: check
 
-$(PROGS):
-	make -C tests/data $@
+# special case
+helloc: tests/data/helloc
+
+$(PROGS): %: tests/data/%
+
+$(PROGS_PATH): %: %.s
+	make -C tests/data $(patsubst tests/data/%, %, $@)
 
 test: check  ## alias for check
 
