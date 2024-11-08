@@ -41,7 +41,7 @@ check: $(PROGS_PATH)  ## emulate all programs and test their output
 	cargo test
 .PHONY: check
 
-# special case
+# special case (this one was compiled & linked from C code)
 helloc: tests/data/helloc
 
 $(PROGS): %: tests/data/%
