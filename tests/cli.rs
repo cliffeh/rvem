@@ -1,8 +1,8 @@
-use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 
 #[test]
 fn test_hello() {
-    let mut cmd = Command::cargo_bin("rvem").unwrap();
+    let mut cmd = cargo_bin_cmd!("rvem");
     let assert = cmd.arg("tests/data/hello").assert();
 
     assert.success().code(0).stdout("Hello World!\n");
@@ -10,7 +10,7 @@ fn test_hello() {
 
 #[test]
 fn test_helloc() {
-    let mut cmd = Command::cargo_bin("rvem").unwrap();
+    let mut cmd = cargo_bin_cmd!("rvem");
     let assert = cmd.arg("tests/data/helloc").assert();
 
     assert.success().code(0).stdout("Hello, World!\n");
@@ -19,7 +19,7 @@ fn test_helloc() {
 #[test]
 #[allow(non_snake_case)]
 fn test_complexMul() {
-    let mut cmd = Command::cargo_bin("rvem").unwrap();
+    let mut cmd = cargo_bin_cmd!("rvem");
     let assert = cmd.arg("tests/data/complexMul").assert();
 
     assert.success().code(0).stdout("-7 + i* 19");
@@ -27,7 +27,7 @@ fn test_complexMul() {
 
 #[test]
 fn test_fac() {
-    let mut cmd = Command::cargo_bin("rvem").unwrap();
+    let mut cmd = cargo_bin_cmd!("rvem");
     let assert = cmd.arg("tests/data/fac").assert();
 
     assert.success().code(0).stdout("120");
@@ -35,7 +35,7 @@ fn test_fac() {
 
 #[test]
 fn test_fib() {
-    let mut cmd = Command::cargo_bin("rvem").unwrap();
+    let mut cmd = cargo_bin_cmd!("rvem");
     let assert = cmd.arg("tests/data/fib").assert();
 
     assert.success().code(0).stdout("267914296");
@@ -43,7 +43,7 @@ fn test_fib() {
 
 #[test]
 fn test_strlen() {
-    let mut cmd = Command::cargo_bin("rvem").unwrap();
+    let mut cmd = cargo_bin_cmd!("rvem");
     let assert = cmd.arg("tests/data/strlen").assert();
 
     assert.success().code(0).stdout("44");

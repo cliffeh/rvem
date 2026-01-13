@@ -1,6 +1,6 @@
 use ::rvem::Emulator;
 use clap::Parser;
-use rvem::{EmulatorError, DEFAULT_MEMORY_SIZE};
+use rvem::{DEFAULT_MEMORY_SIZE, EmulatorError};
 use std::{env, process};
 
 #[derive(Parser, Debug)]
@@ -31,7 +31,7 @@ struct Args {
 
 fn emulate(args: Args) -> Result<(), EmulatorError> {
     if let Some(log_level) = args.log_level {
-        env::set_var("RUST_LOG", log_level);
+        unsafe { env::set_var("RUST_LOG", log_level) };
     }
 
     env_logger::init();
